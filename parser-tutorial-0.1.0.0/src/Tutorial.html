@@ -1,0 +1,989 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE InstanceSigs #-}</span><span> </span><span class="hs-comment">-- allow type signatures in instances</span><span>
+</span><a name="line-2"></a><span class="hs-pragma">{-# LANGUAGE GADTs        #-}</span><span> </span><span class="hs-comment">-- nice GADT syntax</span><span>
+</span><a name="line-3"></a><span>
+</span><a name="line-4"></a><span class="hs-pragma">{-# LANGUAGE ExistentialQuantification #-}</span><span>
+</span><a name="line-5"></a><span class="hs-pragma">{-# LANGUAGE RankNTypes #-}</span><span>
+</span><a name="line-6"></a><span>
+</span><a name="line-7"></a><span class="hs-comment">{-|
+Module      : Tutorial
+Description : A
+Copyright   : (c) Michael Klein, 2017
+License     : BSD3
+Maintainer  : maintainer
+
+Motivation:
+Ok so we want to parse stuff. First of all, what does it mean to parse something?
+According to Google, &quot;Parse (verb): analyze (a sentence) into its parts and describe their syntactic roles&quot;
+So we want to break down, in our case, a string into parts with descriptions.
+What are some things we want to cover with our parser?
+ - We want to be able to parse small pieces with descriptions
+ - We want to be able to combine small parsers into larger parsers
+ - If a parser fails, we should be able to try something else
+
+Ok, these are pretty strightforward. Here's a type that models this:
+
+@
+ `Parse` object :: `String` -&gt; `Either` `String` (`String`, object)
+@
+
+In words, something that parses an @object@ is a function that takes a `String`
+and either fails (returns the input) or succeeds and returns the leftover `String` and the @object@.
+
+Quick note: In Haskell, a `String` is a list of `Char`'s, @[`Char`]@, and @`Either` left right = `Left` left | `Right` right@.
+
+A couple examples:
+
+@
+&quot;abc&quot; = ['a', 'b', 'c']
+`Left` &quot;Hi, I'm 'left'&quot;
+`Right` &quot;Hi, I'm 'right'&quot;
+@
+
+
+In Haskell, we have the following definitions:
+
+@
+type String = [Char]
+
+data Either l r = Left l | Right r
+@
+
+Ok, now that we know what we want, how do we implement it? I use a &quot;newtype&quot; which is just a wrapper type:
+
+-}</span><span>
+</span><a name="line-54"></a><span>
+</span><a name="line-55"></a><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Tutorial</span><span> </span><span class="hs-special">(</span><span>
+</span><a name="line-56"></a><span>  </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><a name="line-57"></a><span>  </span><span class="hs-comment">-- * Classes</span><span>
+</span><a name="line-58"></a><span>  </span><span class="hs-comment">-- $dog_example</span><span>
+</span><a name="line-59"></a><span>  </span><a href="Tutorial.html#Dog"><span class="hs-identifier hs-type">Dog</span></a><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><a name="line-60"></a><span>  </span><a href="Tutorial.html#myPet"><span class="hs-identifier hs-var">myPet</span></a><span class="hs-special">,</span><span>
+</span><a name="line-61"></a><span>  </span><a href="Tutorial.html#Animal"><span class="hs-identifier hs-type">Animal</span></a><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><a name="line-62"></a><span>  </span><span class="hs-comment">-- ** Class applications</span><span>
+</span><a name="line-63"></a><span>  </span><span class="hs-comment">-- $class_applications</span><span>
+</span><a name="line-64"></a><span>
+</span><a name="line-65"></a><span>  </span><span class="hs-comment">-- @@ Combinator classes</span><span>
+</span><a name="line-66"></a><span>  </span><span class="hs-comment">-- $combinator_classes</span><span>
+</span><a name="line-67"></a><span>
+</span><a name="line-68"></a><span>  </span><span class="hs-comment">-- * Class instances</span><span>
+</span><a name="line-69"></a><span>  </span><span class="hs-comment">-- ** Functor instance</span><span>
+</span><a name="line-70"></a><span>  </span><span class="hs-comment">-- $functor_instance</span><span>
+</span><a name="line-71"></a><span>
+</span><a name="line-72"></a><span>  </span><span class="hs-comment">-- ** Applicative instance</span><span>
+</span><a name="line-73"></a><span>  </span><span class="hs-comment">-- $applicative_instance</span><span>
+</span><a name="line-74"></a><span>  </span><span class="hs-comment">-- $applicative_parse</span><span>
+</span><a name="line-75"></a><span>
+</span><a name="line-76"></a><span>  </span><span class="hs-comment">-- ** Monad instance</span><span>
+</span><a name="line-77"></a><span>  </span><span class="hs-comment">-- $monad_instance</span><span>
+</span><a name="line-78"></a><span>  </span><span class="hs-comment">-- $io_is_monad</span><span>
+</span><a name="line-79"></a><span>
+</span><a name="line-80"></a><span>  </span><span class="hs-comment">-- ** Alternative instance</span><span>
+</span><a name="line-81"></a><span>  </span><span class="hs-comment">-- $alternative_instance</span><span>
+</span><a name="line-82"></a><span>  </span><a href="Tutorial.html#parse"><span class="hs-identifier hs-var">parse</span></a><span class="hs-special">,</span><span>
+</span><a name="line-83"></a><span>  </span><span class="hs-comment">-- $writing_actual_parsers</span><span>
+</span><a name="line-84"></a><span>  </span><a href="Tutorial.html#charP"><span class="hs-identifier hs-var">charP</span></a><span class="hs-special">,</span><span>
+</span><a name="line-85"></a><span>  </span><a href="Tutorial.html#char"><span class="hs-identifier hs-var">char</span></a><span class="hs-special">,</span><span>
+</span><a name="line-86"></a><span>  </span><a href="Tutorial.html#digit"><span class="hs-identifier hs-var">digit</span></a><span class="hs-special">,</span><span>
+</span><a name="line-87"></a><span>  </span><a href="Tutorial.html#anyChar"><span class="hs-identifier hs-var">anyChar</span></a><span class="hs-special">,</span><span>
+</span><a name="line-88"></a><span>  </span><a href="Tutorial.html#notP"><span class="hs-identifier hs-var">notP</span></a><span class="hs-special">,</span><span>
+</span><a name="line-89"></a><span>  </span><a href="Tutorial.html#string"><span class="hs-identifier hs-var">string</span></a><span class="hs-special">,</span><span>
+</span><a name="line-90"></a><span>  </span><a href="Tutorial.html#elemP"><span class="hs-identifier hs-var">elemP</span></a><span class="hs-special">,</span><span>
+</span><a name="line-91"></a><span>  </span><span class="hs-special">(</span><a href="Tutorial.html#%3C%3C"><span class="hs-operator hs-var">&lt;&lt;</span></a><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><a name="line-92"></a><span>  </span><a href="Tutorial.html#space"><span class="hs-identifier hs-var">space</span></a><span class="hs-special">,</span><span>
+</span><a name="line-93"></a><span>  </span><a href="Tutorial.html#inParens"><span class="hs-identifier hs-var">inParens</span></a><span class="hs-special">,</span><span>
+</span><a name="line-94"></a><span>  </span><a href="Tutorial.html#word"><span class="hs-identifier hs-var">word</span></a><span class="hs-special">,</span><span>
+</span><a name="line-95"></a><span>  </span><a href="Tutorial.html#name"><span class="hs-identifier hs-var">name</span></a><span class="hs-special">,</span><span>
+</span><a name="line-96"></a><span>  </span><a href="Tutorial.html#classType"><span class="hs-identifier hs-var">classType</span></a><span class="hs-special">,</span><span>
+</span><a name="line-97"></a><span>  </span><span class="hs-comment">-- ** Writing a recursive parser</span><span>
+</span><a name="line-98"></a><span>  </span><span class="hs-comment">-- $parse_lisp</span><span>
+</span><a name="line-99"></a><span>  </span><a href="Tutorial.html#Expr"><span class="hs-identifier hs-type">Expr</span></a><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><a name="line-100"></a><span>  </span><a href="Tutorial.html#parseLit"><span class="hs-identifier hs-var">parseLit</span></a><span class="hs-special">,</span><span>
+</span><a name="line-101"></a><span>  </span><a href="Tutorial.html#parseSum"><span class="hs-identifier hs-var">parseSum</span></a><span class="hs-special">,</span><span>
+</span><a name="line-102"></a><span>  </span><a href="Tutorial.html#parseExpr"><span class="hs-identifier hs-var">parseExpr</span></a><span class="hs-special">,</span><span>
+</span><a name="line-103"></a><span>  </span><span class="hs-comment">-- $that_was_easy</span><span>
+</span><a name="line-104"></a><span>  </span><a href="Tutorial.html#eval"><span class="hs-identifier hs-var">eval</span></a><span class="hs-special">,</span><span>
+</span><a name="line-105"></a><span>  </span><span class="hs-comment">-- $conclusions</span><span>
+</span><a name="line-106"></a><span>  </span><a href="Tutorial.html#toParser"><span class="hs-identifier hs-var">toParser</span></a><span>
+</span><a name="line-107"></a><span>                </span><span class="hs-special">)</span><span class="hs-keyword">where</span><span>
+</span><a name="line-108"></a><span>
+</span><a name="line-109"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Control</span><span class="hs-operator">.</span><span class="hs-identifier">Applicative</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-type">Alternative</span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><a name="line-110"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Data</span><span class="hs-operator">.</span><span class="hs-identifier">Char</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">isAlpha</span><span class="hs-special">,</span><span> </span><span class="hs-identifier hs-var">isDigit</span><span class="hs-special">,</span><span> </span><span class="hs-identifier hs-var">isSpace</span><span class="hs-special">)</span><span>
+</span><a name="line-111"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Data</span><span class="hs-operator">.</span><span class="hs-identifier">Either</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><a name="line-112"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Control</span><span class="hs-operator">.</span><span class="hs-identifier">Monad</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><a name="line-113"></a><span>
+</span><a name="line-114"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Test</span><span class="hs-operator">.</span><span class="hs-identifier">QuickCheck</span><span>
+</span><a name="line-115"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Test</span><span class="hs-operator">.</span><span class="hs-identifier">QuickCheck</span><span class="hs-operator">.</span><span class="hs-identifier">Checkers</span><span>
+</span><a name="line-116"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Control</span><span class="hs-operator">.</span><span class="hs-identifier">Monad</span><span>
+</span><a name="line-117"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Test</span><span class="hs-operator">.</span><span class="hs-identifier">QuickCheck</span><span class="hs-operator">.</span><span class="hs-identifier">Modifiers</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><a name="line-118"></a><span>
+</span><a name="line-119"></a><span class="hs-comment">-- | What does this mean? It means &quot;Parse a&quot; has the constructor &quot;Parser&quot;,</span><span>
+</span><a name="line-120"></a><span class="hs-comment">-- takes a function of that long type, and you can pull out the internal function</span><span>
+</span><a name="line-121"></a><span class="hs-comment">-- with the function `runParser`. So if we have a parsing function:</span><span>
+</span><a name="line-122"></a><span class="hs-comment">--</span><span>
+</span><a name="line-123"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-124"></a><span class="hs-comment">--  iParse :: String -&gt; Either String (String, Stuff)</span><span>
+</span><a name="line-125"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-126"></a><span class="hs-comment">--</span><span>
+</span><a name="line-127"></a><span class="hs-comment">-- we can do @`Parser` iParse :: `Parse` Stuff@ (the fancy notation &quot;::&quot; can be translated as &quot;has the type&quot;).</span><span>
+</span><a name="line-128"></a><span class="hs-keyword">newtype</span><span> </span><a name="Parse"><a href="Tutorial.html#Parse"><span class="hs-identifier">Parse</span></a></a><span> </span><a name="local-6989586621679030831"><a href="#local-6989586621679030831"><span class="hs-identifier">a</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a name="Parser"><a href="Tutorial.html#Parser"><span class="hs-identifier">Parser</span></a></a><span> </span><span class="hs-special">{</span><span> </span><a name="runParser"><a href="Tutorial.html#runParser"><span class="hs-identifier">runParser</span></a></a><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">String</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier hs-type">Either</span><span> </span><span class="hs-identifier hs-type">String</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-type">String</span><span class="hs-special">,</span><span> </span><a href="#local-6989586621679030831"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span> </span><span class="hs-special">}</span><span>
+</span><a name="line-129"></a><span>
+</span><a name="line-130"></a><span class="hs-comment">-- | Dummy instance for testing</span><span>
+</span><a name="line-131"></a><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier hs-type">Show</span><span> </span><a href="#local-6989586621679034033"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier hs-type">Show</span><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679034033"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-132"></a><span>  </span><a name="local-8214565720323791420"><span class="hs-identifier">show</span></a><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><a name="local-6989586621679034034"><a href="#local-6989586621679034034"><span class="hs-identifier">x</span></a></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">show</span><span> </span><span class="hs-special">(</span><a href="#local-6989586621679034034"><span class="hs-identifier hs-var">x</span></a><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><a name="line-133"></a><span>
+</span><a name="line-134"></a><span class="hs-comment">-- | Use `toParser` with an arbitrary function</span><span>
+</span><a name="line-135"></a><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier hs-type">Arbitrary</span><span> </span><a href="#local-6989586621679034032"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier hs-type">Arbitrary</span><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679034032"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-136"></a><span>  </span><a name="local-8214565720323785297"><span class="hs-identifier">arbitrary</span></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#toParser"><span class="hs-identifier hs-var">toParser</span></a><span> </span><span class="hs-operator hs-var">&lt;$&gt;</span><span> </span><span class="hs-identifier hs-var">arbitrary</span><span>
+</span><a name="line-137"></a><span>
+</span><a name="line-138"></a><span class="hs-comment">-- | Just unwrap the `Parser`</span><span>
+</span><a name="line-139"></a><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier hs-type">EqProp</span><span> </span><a href="#local-6989586621679034029"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier hs-type">EqProp</span><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679034029"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-140"></a><span>  </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><a name="local-6989586621679034030"><a href="#local-6989586621679034030"><span class="hs-identifier">p</span></a></a><span> </span><a name="local-8214565720323791717"><span class="hs-operator">=-=</span></a><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><a name="local-6989586621679034031"><a href="#local-6989586621679034031"><span class="hs-identifier">q</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="#local-6989586621679034030"><span class="hs-identifier hs-var">p</span></a><span> </span><span class="hs-operator hs-var">=-=</span><span> </span><a href="#local-6989586621679034031"><span class="hs-identifier hs-var">q</span></a><span>
+</span><a name="line-141"></a><span>
+</span><a name="line-142"></a><span class="hs-comment">-- | Just use the derived `Eq` instance</span><span>
+</span><a name="line-143"></a><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier hs-type">Eq</span><span> </span><a href="#local-6989586621679034028"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier hs-type">EqProp</span><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Expr"><span class="hs-identifier hs-type">Expr</span></a><span> </span><a href="#local-6989586621679034028"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-144"></a><span>  </span><span class="hs-special">(</span><a name="local-8214565720323791717"><span class="hs-operator">=-=</span></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">eq</span><span>
+</span><a name="line-145"></a><span>
+</span><a name="line-146"></a><span class="hs-keyword">newtype</span><span> </span><a name="ShortList"><a href="Tutorial.html#ShortList"><span class="hs-identifier">ShortList</span></a></a><span> </span><a name="local-6989586621679030830"><a href="#local-6989586621679030830"><span class="hs-identifier">a</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a name="ShortList"><a href="Tutorial.html#ShortList"><span class="hs-identifier">ShortList</span></a></a><span> </span><span class="hs-special">{</span><span> </span><a name="getShortList"><a href="Tutorial.html#getShortList"><span class="hs-identifier">getShortList</span></a></a><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><a href="#local-6989586621679030830"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">]</span><span> </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-type">Eq</span><span class="hs-special">,</span><span> </span><span class="hs-identifier hs-type">Ord</span><span class="hs-special">,</span><span> </span><span class="hs-identifier hs-type">Show</span><span class="hs-special">)</span><span>
+</span><a name="line-147"></a><span>
+</span><a name="line-148"></a><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier hs-type">Arbitrary</span><span> </span><a href="#local-6989586621679034026"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier hs-type">Arbitrary</span><span> </span><span class="hs-special">(</span><a href="Tutorial.html#ShortList"><span class="hs-identifier hs-type">ShortList</span></a><span> </span><a href="#local-6989586621679034026"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-149"></a><span>  </span><a name="local-8214565720323785297"><span class="hs-identifier">arbitrary</span></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><a name="line-150"></a><span>    </span><a name="local-6989586621679034027"><a href="#local-6989586621679034027"><span class="hs-identifier">n</span></a></a><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-identifier hs-var">choose</span><span> </span><span class="hs-special">(</span><span class="hs-number">1</span><span class="hs-special">,</span><span> </span><span class="hs-number">3</span><span class="hs-special">)</span><span>
+</span><a name="line-151"></a><span>    </span><a href="Tutorial.html#ShortList"><span class="hs-identifier hs-var">ShortList</span></a><span> </span><span class="hs-operator hs-var">&lt;$&gt;</span><span> </span><span class="hs-identifier hs-var">vectorOf</span><span> </span><a href="#local-6989586621679034027"><span class="hs-identifier hs-var">n</span></a><span> </span><span class="hs-identifier hs-var">arbitrary</span><span>
+</span><a name="line-152"></a><span>  </span><span class="hs-comment">-- shrink (ShortList xs) = ShortList . getNonEmpty &lt;$&gt; shrink (NonEmpty xs)</span><span>
+</span><a name="line-153"></a><span>
+</span><a name="line-154"></a><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-type">Num</span><span> </span><a href="#local-6989586621679033856"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">,</span><span> </span><span class="hs-identifier hs-type">Ord</span><span> </span><a href="#local-6989586621679033856"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">,</span><span> </span><span class="hs-identifier hs-type">Arbitrary</span><span> </span><a href="#local-6989586621679033856"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier hs-type">Arbitrary</span><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Expr"><span class="hs-identifier hs-type">Expr</span></a><span> </span><a href="#local-6989586621679033856"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-155"></a><span>  </span><a name="local-8214565720323785297"><span class="hs-identifier">arbitrary</span></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">oneof</span><span> </span><span class="hs-special">[</span><span> </span><a href="Tutorial.html#Lit"><span class="hs-identifier hs-var">Lit</span></a><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-identifier">getNonNegative</span><span> </span><span class="hs-operator hs-var">&lt;$&gt;</span><span> </span><span class="hs-identifier hs-var">arbitrary</span><span class="hs-special">,</span><span> </span><a href="Tutorial.html#Sum"><span class="hs-identifier hs-var">Sum</span></a><span> </span><span class="hs-operator hs-var">&lt;$&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">fmap</span><span> </span><span class="hs-identifier">getShortList</span><span> </span><span class="hs-identifier hs-var">arbitrary</span><span class="hs-special">)</span><span> </span><span class="hs-special">]</span><span>
+</span><a name="line-156"></a><span>
+</span><a name="line-157"></a><span>  </span><span class="hs-comment">-- shrink (Lit x ) = Lit &lt;$&gt; shrink x</span><span>
+</span><a name="line-158"></a><span>  </span><span class="hs-comment">-- shrink (Sum xs) = Sum &lt;$&gt; shrink xs</span><span>
+</span><a name="line-159"></a><span>
+</span><a name="line-160"></a><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-type">CoArbitrary</span><span> </span><a href="#local-6989586621679033853"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier hs-type">CoArbitrary</span><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Expr"><span class="hs-identifier hs-type">Expr</span></a><span> </span><a href="#local-6989586621679033853"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-161"></a><span>  </span><a name="local-8214565720323785299"><span class="hs-identifier">coarbitrary</span></a><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Lit"><span class="hs-identifier hs-var">Lit</span></a><span> </span><a name="local-6989586621679033854"><a href="#local-6989586621679033854"><span class="hs-identifier">x</span></a></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">coarbitrary</span><span> </span><a href="#local-6989586621679033854"><span class="hs-identifier hs-var">x</span></a><span>
+</span><a name="line-162"></a><span>  </span><span class="hs-identifier">coarbitrary</span><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Sum"><span class="hs-identifier hs-var">Sum</span></a><span> </span><a name="local-6989586621679033855"><a href="#local-6989586621679033855"><span class="hs-identifier">x</span></a></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">coarbitrary</span><span> </span><a href="#local-6989586621679033855"><span class="hs-identifier hs-var">x</span></a><span>
+</span><a name="line-163"></a><span>
+</span><a name="line-164"></a><span class="hs-comment">-- | (This is for the test suite, but defined here because I haven't moved it yet.) Convert a</span><span>
+</span><a name="line-165"></a><span class="hs-comment">--</span><span>
+</span><a name="line-166"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-167"></a><span class="hs-comment">--  `String` -&gt; (`Bool`, `Int`, a)</span><span>
+</span><a name="line-168"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-169"></a><span class="hs-comment">--</span><span>
+</span><a name="line-170"></a><span class="hs-comment">-- function into a parser by:</span><span>
+</span><a name="line-171"></a><span class="hs-comment">--</span><span>
+</span><a name="line-172"></a><span class="hs-comment">--  * If the `Bool` is `False`, consume no input</span><span>
+</span><a name="line-173"></a><span class="hs-comment">--  * If the `Bool` is `True`, consume the `Int` characters of input if available, else fail</span><span>
+</span><a name="line-174"></a><span class="hs-identifier">toParser</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-type">String</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-type">Bool</span><span class="hs-special">,</span><span> </span><span class="hs-identifier hs-type">Int</span><span class="hs-special">,</span><span> </span><a href="#local-6989586621679031347"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679031347"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-175"></a><a name="toParser"><a href="Tutorial.html#toParser"><span class="hs-identifier">toParser</span></a></a><span> </span><a name="local-6989586621679031348"><a href="#local-6989586621679031348"><span class="hs-identifier">p</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><a name="local-6989586621679031349"><a href="#local-6989586621679031349"><span class="hs-identifier">s</span></a></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">case</span><span> </span><a href="#local-6989586621679031348"><span class="hs-identifier hs-var">p</span></a><span> </span><a href="#local-6989586621679031349"><span class="hs-identifier hs-var">s</span></a><span> </span><span class="hs-keyword">of</span><span>
+</span><a name="line-176"></a><span>                            </span><span class="hs-special">(</span><span class="hs-identifier hs-var">False</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">_</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">_</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier hs-var">Left</span><span> </span><a href="#local-6989586621679031349"><span class="hs-identifier hs-var">s</span></a><span>
+</span><a name="line-177"></a><span>                            </span><span class="hs-special">(</span><span class="hs-identifier">_</span><span>    </span><span class="hs-special">,</span><span> </span><a name="local-6989586621679031350"><a href="#local-6989586621679031350"><span class="hs-identifier">n</span></a></a><span class="hs-special">,</span><span> </span><a name="local-6989586621679031351"><a href="#local-6989586621679031351"><span class="hs-identifier">x</span></a></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="hs-number">0</span><span> </span><span class="hs-operator hs-var">&lt;=</span><span> </span><a href="#local-6989586621679031350"><span class="hs-identifier hs-var">n</span></a><span> </span><span class="hs-operator hs-var">&amp;&amp;</span><span> </span><a href="#local-6989586621679031350"><span class="hs-identifier hs-var">n</span></a><span> </span><span class="hs-operator hs-var">&lt;=</span><span> </span><span class="hs-identifier hs-var">length</span><span> </span><a href="#local-6989586621679031349"><span class="hs-identifier hs-var">s</span></a><span>
+</span><a name="line-178"></a><span>                                                </span><span class="hs-keyword">then</span><span> </span><span class="hs-identifier hs-var">Right</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">drop</span><span> </span><a href="#local-6989586621679031350"><span class="hs-identifier hs-var">n</span></a><span> </span><a href="#local-6989586621679031349"><span class="hs-identifier hs-var">s</span></a><span class="hs-special">,</span><span> </span><a href="#local-6989586621679031351"><span class="hs-identifier hs-var">x</span></a><span class="hs-special">)</span><span>
+</span><a name="line-179"></a><span>                                                </span><span class="hs-keyword">else</span><span> </span><span class="hs-identifier hs-var">Left</span><span> </span><a href="#local-6989586621679031349"><span class="hs-identifier hs-var">s</span></a><span>
+</span><a name="line-180"></a><span>                    </span><span class="hs-special">)</span><span>
+</span><a name="line-181"></a><span>
+</span><a name="line-182"></a><span>
+</span><a name="line-183"></a><span>
+</span><a name="line-184"></a><span>
+</span><a name="line-185"></a><span class="hs-comment">-- $dog_example</span><span>
+</span><a name="line-186"></a><span class="hs-comment">-- Ok, now let's make some combinators for our type. In Haskell, type classes are basically facts.</span><span>
+</span><a name="line-187"></a><span class="hs-comment">-- Given a fact about an object, you can derive other things.</span><span>
+</span><a name="line-188"></a><span>
+</span><a name="line-189"></a><span class="hs-comment">-- | `Dog`s have names</span><span>
+</span><a name="line-190"></a><span class="hs-keyword">data</span><span> </span><a name="Dog"><a href="Tutorial.html#Dog"><span class="hs-identifier">Dog</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a name="Dog"><a href="Tutorial.html#Dog"><span class="hs-identifier">Dog</span></a></a><span> </span><span class="hs-special">{</span><span> </span><a name="dogName"><a href="Tutorial.html#dogName"><span class="hs-identifier">dogName</span></a></a><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">String</span><span> </span><span class="hs-special">}</span><span>
+</span><a name="line-191"></a><span>
+</span><a name="line-192"></a><span class="hs-comment">-- | For example, if all animals have a name and Fido is an animal, then Fido has a name</span><span>
+</span><a name="line-193"></a><span class="hs-comment">--</span><span>
+</span><a name="line-194"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-195"></a><span class="hs-comment">-- myPet = Dog \&quot;Fido\&quot;</span><span>
+</span><a name="line-196"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-197"></a><span class="hs-identifier">myPet</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Dog"><span class="hs-identifier hs-type">Dog</span></a><span>
+</span><a name="line-198"></a><a name="myPet"><a href="Tutorial.html#myPet"><span class="hs-identifier">myPet</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#Dog"><span class="hs-identifier hs-var">Dog</span></a><span> </span><span class="hs-string">&quot;Fido&quot;</span><span>
+</span><a name="line-199"></a><span>
+</span><a name="line-200"></a><span class="hs-comment">-- | This is equivalent to defining that all `Animal`s have names</span><span>
+</span><a name="line-201"></a><span class="hs-keyword">class</span><span> </span><a name="Animal"><a href="Tutorial.html#Animal"><span class="hs-identifier">Animal</span></a></a><span> </span><a name="local-6989586621679030829"><a href="#local-6989586621679030829"><span class="hs-identifier">animal</span></a></a><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-202"></a><span>  </span><span class="hs-comment">-- | The full type is:</span><span>
+</span><a name="line-203"></a><span>  </span><span class="hs-comment">--</span><span>
+</span><a name="line-204"></a><span>  </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-205"></a><span>  </span><span class="hs-comment">-- getName :: Animal animal =&gt; animal -&gt; String</span><span>
+</span><a name="line-206"></a><span>  </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-207"></a><span>  </span><span class="hs-comment">--</span><span>
+</span><a name="line-208"></a><span>  </span><span class="hs-comment">-- Which can be read as: &quot;if @animal@ is an `Animal`, then we can get it's name, which is a `String`&quot;</span><span>
+</span><a name="line-209"></a><span>  </span><span class="hs-identifier">getName</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="#local-6989586621679030829"><span class="hs-identifier hs-type">animal</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier hs-type">String</span><span>
+</span><a name="line-210"></a><span>
+</span><a name="line-211"></a><span class="hs-comment">-- | Here, @`getName` = `dogName`@</span><span>
+</span><a name="line-212"></a><span class="hs-keyword">instance</span><span> </span><a href="Tutorial.html#Animal"><span class="hs-identifier hs-type">Animal</span></a><span> </span><a href="Tutorial.html#Dog"><span class="hs-identifier hs-type">Dog</span></a><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-213"></a><span>  </span><a name="local-8214565720323800316"><a href="Tutorial.html#getName"><span class="hs-identifier">getName</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">dogName</span><span>
+</span><a name="line-214"></a><span>
+</span><a name="line-215"></a><span class="hs-comment">-- $class_applications</span><span>
+</span><a name="line-216"></a><span class="hs-comment">-- Now suppose we want to make a &quot;myFavoriteAnimal&quot; function. Well, we could do the following:</span><span>
+</span><a name="line-217"></a><span class="hs-comment">--</span><span>
+</span><a name="line-218"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-219"></a><span class="hs-comment">-- myFavoriteDog :: `Dog` -&gt; `String`</span><span>
+</span><a name="line-220"></a><span class="hs-comment">-- myFavoriteDog (`Dog` name) = &quot;My favorite animal is named: &quot; `++` name</span><span>
+</span><a name="line-221"></a><span class="hs-comment">--</span><span>
+</span><a name="line-222"></a><span class="hs-comment">-- myFavoriteBird :: Bird -&gt; `String`</span><span>
+</span><a name="line-223"></a><span class="hs-comment">-- ..</span><span>
+</span><a name="line-224"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-225"></a><span class="hs-comment">--</span><span>
+</span><a name="line-226"></a><span class="hs-comment">-- Or, we can make a &quot;classy&quot; function:</span><span>
+</span><a name="line-227"></a><span class="hs-comment">--</span><span>
+</span><a name="line-228"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-229"></a><span class="hs-comment">-- myFavoriteAnimal :: `Animal` animal =&gt; animal -&gt; `String`</span><span>
+</span><a name="line-230"></a><span class="hs-comment">-- myFavoriteAnimal namedAnimal = &quot;My favorite animal is named: &quot; `++` `getName` namedAnimal</span><span>
+</span><a name="line-231"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-232"></a><span class="hs-comment">--</span><span>
+</span><a name="line-233"></a><span class="hs-comment">-- Whoh, what's that fancy &quot;`Animal` animal =&gt; animal&quot; stuff? It means that &quot;animal&quot; must have an instance of the</span><span>
+</span><a name="line-234"></a><span class="hs-comment">-- `Animal` class for it to work with the function. In other words, it works for _every_ animal of the `Animal` class.</span><span>
+</span><a name="line-235"></a><span>
+</span><a name="line-236"></a><span class="hs-comment">-- $combinator_classes</span><span>
+</span><a name="line-237"></a><span class="hs-comment">-- Now onto combinator classes. One important class is `Functor`, (minimally) defined as so:</span><span>
+</span><a name="line-238"></a><span class="hs-comment">--</span><span>
+</span><a name="line-239"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-240"></a><span class="hs-comment">-- class `Functor` f where</span><span>
+</span><a name="line-241"></a><span class="hs-comment">--   `fmap` :: (a -&gt; b) -&gt; f a -&gt; f b</span><span>
+</span><a name="line-242"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-243"></a><span class="hs-comment">--</span><span>
+</span><a name="line-244"></a><span class="hs-comment">-- It also has the requirements (Not enforced by Haskell):</span><span>
+</span><a name="line-245"></a><span class="hs-comment">--</span><span>
+</span><a name="line-246"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-247"></a><span class="hs-comment">--  `fmap` `id` `==` `id`</span><span>
+</span><a name="line-248"></a><span class="hs-comment">--  `fmap` (f `.` g) `==` `fmap` f `.` `fmap` g</span><span>
+</span><a name="line-249"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-250"></a><span class="hs-comment">--</span><span>
+</span><a name="line-251"></a><span class="hs-comment">-- What does this mean? Well `Functor` takes a type @t@ and converts an @a -&gt; b@ function into a @t a -&gt; t b@ one.</span><span>
+</span><a name="line-252"></a><span class="hs-comment">--</span><span>
+</span><a name="line-253"></a><span class="hs-comment">-- A common example is the `map` function:</span><span>
+</span><a name="line-254"></a><span class="hs-comment">--</span><span>
+</span><a name="line-255"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-256"></a><span class="hs-comment">--  `map` :: (a -&gt; b) -&gt; [a] -&gt; [b]</span><span>
+</span><a name="line-257"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-258"></a><span class="hs-comment">--</span><span>
+</span><a name="line-259"></a><span class="hs-comment">-- `map` takes a function from @a@ to @b@ and a list of elements with type @a@. It then applies the function to every element</span><span>
+</span><a name="line-260"></a><span class="hs-comment">-- so the resulting elements are of type @b@.</span><span>
+</span><a name="line-261"></a><span class="hs-comment">--</span><span>
+</span><a name="line-262"></a><span class="hs-comment">-- That's basically what `fmap` does; If you have a way to get from @Type1@ to @Type2@, you can get from a &quot;container&quot; of @Type1@'s to a container of @Type2@'s.</span><span>
+</span><a name="line-263"></a><span class="hs-comment">--</span><span>
+</span><a name="line-264"></a><span class="hs-comment">-- So what are other &quot;containers&quot;? @(`Either` left)@ is a `Functor`, with</span><span>
+</span><a name="line-265"></a><span class="hs-comment">--</span><span>
+</span><a name="line-266"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-267"></a><span class="hs-comment">--  `fmap` :: (a -&gt; b) -&gt; `Either` left a -&gt; `Either` left b</span><span>
+</span><a name="line-268"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-269"></a><span class="hs-comment">--</span><span>
+</span><a name="line-270"></a><span class="hs-comment">-- A fun example: if we have a function</span><span>
+</span><a name="line-271"></a><span class="hs-comment">--</span><span>
+</span><a name="line-272"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-273"></a><span class="hs-comment">--  infuriateCoder :: Coder -&gt; AngryCoder</span><span>
+</span><a name="line-274"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-275"></a><span class="hs-comment">--</span><span>
+</span><a name="line-276"></a><span class="hs-comment">-- then @`fmap` infuriateCoder@ can do several things:</span><span>
+</span><a name="line-277"></a><span class="hs-comment">--</span><span>
+</span><a name="line-278"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-279"></a><span class="hs-comment">--  `fmap` infuriateCoder :: `Either` NonCoder Coder -&gt; `Either` NonCoder AngryCoder</span><span>
+</span><a name="line-280"></a><span class="hs-comment">--  -- Only infuriate coders, we'd need another function for NonCoder's</span><span>
+</span><a name="line-281"></a><span class="hs-comment">--</span><span>
+</span><a name="line-282"></a><span class="hs-comment">--  `fmap` infuriateCoder :: RoomFullOf Coder -&gt; RoomFullOf AngryCoder</span><span>
+</span><a name="line-283"></a><span class="hs-comment">--  -- Infuriate everyone in the room, who happen to all be Coders</span><span>
+</span><a name="line-284"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-285"></a><span class="hs-comment">--</span><span>
+</span><a name="line-286"></a><span class="hs-comment">-- Here's where it starts to get really neat. What if we have a @RoomFullOf (`Either` NonCoder Coder)@ and we want to infuriate all the coders in the room?</span><span>
+</span><a name="line-287"></a><span class="hs-comment">-- That's just:</span><span>
+</span><a name="line-288"></a><span class="hs-comment">--</span><span>
+</span><a name="line-289"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-290"></a><span class="hs-comment">--  `fmap` (`fmap` infuriateCoder) :: RoomFullOf (`Either` NonCoder Coder) -&gt; RoomFullOf (`Either` NonCoder AngryCoder)</span><span>
+</span><a name="line-291"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-292"></a><span class="hs-comment">--</span><span>
+</span><a name="line-293"></a><span class="hs-comment">-- Whoh! What happened there? Well let's look at the type of `fmap` for @RoomFullOf a@:</span><span>
+</span><a name="line-294"></a><span class="hs-comment">--</span><span>
+</span><a name="line-295"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-296"></a><span class="hs-comment">--  `fmap` :: (a -&gt; b) -&gt; RoomFullOf a -&gt; RoomFullOf b</span><span>
+</span><a name="line-297"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-298"></a><span class="hs-comment">--</span><span>
+</span><a name="line-299"></a><span class="hs-comment">-- Ah, so since @`fmap` infuriateCoder@ works on @`Either` NonCoder Coder@, `fmap` can also apply it to everyone in the room.</span><span>
+</span><a name="line-300"></a><span class="hs-comment">--</span><span>
+</span><a name="line-301"></a><span class="hs-comment">--</span><span>
+</span><a name="line-302"></a><span class="hs-comment">-- What about those requirements? What do those mean?</span><span>
+</span><a name="line-303"></a><span class="hs-comment">--</span><span>
+</span><a name="line-304"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-305"></a><span class="hs-comment">--  `fmap` `id` `==` `id`                   -- means that fmapping the identity to all the objects in &quot;t object&quot; should do nothing</span><span>
+</span><a name="line-306"></a><span class="hs-comment">--  `fmap` (f `.` g) `==` `fmap` f `.` `fmap` g -- means that fmapping one function then another is the same as fmapping &quot;both at once&quot;</span><span>
+</span><a name="line-307"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-308"></a><span class="hs-comment">--</span><span>
+</span><a name="line-309"></a><span class="hs-comment">-- So `Functor` is really useful, it allows us to get inside some type and modify what it contains.</span><span>
+</span><a name="line-310"></a><span class="hs-comment">--</span><span>
+</span><a name="line-311"></a><span class="hs-comment">-- How can we apply this to a parser and what can it help with?</span><span>
+</span><a name="line-312"></a><span class="hs-comment">--</span><span>
+</span><a name="line-313"></a><span class="hs-comment">-- Well the type of `fmap` for `Parse` is:</span><span>
+</span><a name="line-314"></a><span class="hs-comment">--</span><span>
+</span><a name="line-315"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-316"></a><span class="hs-comment">--  `fmap` :: (a -&gt; b) -&gt; `Parse` a -&gt; `Parse` b</span><span>
+</span><a name="line-317"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-318"></a><span class="hs-comment">--</span><span>
+</span><a name="line-319"></a><span class="hs-comment">-- Here's an example:</span><span>
+</span><a name="line-320"></a><span class="hs-comment">--</span><span>
+</span><a name="line-321"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-322"></a><span class="hs-comment">--  translateInsult :: EnglishInsult -&gt; GermanInsult</span><span>
+</span><a name="line-323"></a><span class="hs-comment">--  parseEnglishInsult :: `Parse` EnglishInsult</span><span>
+</span><a name="line-324"></a><span class="hs-comment">--  `fmap` translateInsult parseEnglishInsult :: `Parse` GermanInsult</span><span>
+</span><a name="line-325"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-326"></a><span class="hs-comment">--</span><span>
+</span><a name="line-327"></a><span class="hs-comment">-- This means that we can take something that works with the results of a parser and inject it into that parser.</span><span>
+</span><a name="line-328"></a><span class="hs-comment">--</span><span>
+</span><a name="line-329"></a><span class="hs-comment">-- This allows us to easily package the post-processing into our parser. Here's a slightly more practical example:</span><span>
+</span><a name="line-330"></a><span class="hs-comment">--</span><span>
+</span><a name="line-331"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-332"></a><span class="hs-comment">--  toJSON :: Account -&gt; JSON Account</span><span>
+</span><a name="line-333"></a><span class="hs-comment">--</span><span>
+</span><a name="line-334"></a><span class="hs-comment">--  parseAccount :: `Parse` Account</span><span>
+</span><a name="line-335"></a><span class="hs-comment">--</span><span>
+</span><a name="line-336"></a><span class="hs-comment">--  parseAccountJSON :: `Parse` (JSON Account)</span><span>
+</span><a name="line-337"></a><span class="hs-comment">--  parseAccountJSON = `fmap` toJSON parseAccount</span><span>
+</span><a name="line-338"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-339"></a><span class="hs-comment">--</span><span>
+</span><a name="line-340"></a><span class="hs-comment">-- Now we can write @parseAccount@ without having to worry about JSON conversion and convert to JSON without worrying about parsing.</span><span>
+</span><a name="line-341"></a><span class="hs-comment">--</span><span>
+</span><a name="line-342"></a><span class="hs-comment">-- All good stuff.</span><span>
+</span><a name="line-343"></a><span>
+</span><a name="line-344"></a><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier hs-type">Functor</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-345"></a><span>  </span><span class="hs-identifier">fmap</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><a href="#local-6989586621679033849"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="#local-6989586621679033850"><span class="hs-identifier hs-type">b</span></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679033849"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679033850"><span class="hs-identifier hs-type">b</span></a><span>
+</span><a name="line-346"></a><span>  </span><a name="local-3458764513820541101"><span class="hs-identifier">fmap</span></a><span> </span><a name="local-6989586621679033851"><a href="#local-6989586621679033851"><span class="hs-identifier">f</span></a></a><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><a name="local-6989586621679033852"><a href="#local-6989586621679033852"><span class="hs-identifier">p</span></a></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">fmap</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">fmap</span><span> </span><a href="#local-6989586621679033851"><span class="hs-identifier hs-var">f</span></a><span class="hs-special">)</span><span> </span><span class="hs-operator hs-var">.</span><span> </span><a href="#local-6989586621679033852"><span class="hs-identifier hs-var">p</span></a><span class="hs-special">)</span><span>
+</span><a name="line-347"></a><span>
+</span><a name="line-348"></a><span class="hs-comment">-- $functor_instance</span><span>
+</span><a name="line-349"></a><span class="hs-comment">-- Now the actual Functor instance:</span><span>
+</span><a name="line-350"></a><span class="hs-comment">--</span><span>
+</span><a name="line-351"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-352"></a><span class="hs-comment">-- instance `Functor` `Parse` where</span><span>
+</span><a name="line-353"></a><span class="hs-comment">--   `fmap` :: (a -&gt; b) -&gt; `Parse` a -&gt; `Parse` b</span><span>
+</span><a name="line-354"></a><span class="hs-comment">--   `fmap` f (`Parser` p) = `Parser` (`fmap` (`fmap` f) . p)</span><span>
+</span><a name="line-355"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-356"></a><span class="hs-comment">--</span><span>
+</span><a name="line-357"></a><span class="hs-comment">-- To begin to make sense of this, here's what's going on:</span><span>
+</span><a name="line-358"></a><span class="hs-comment">--</span><span>
+</span><a name="line-359"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-360"></a><span class="hs-comment">--  `Parser` (`fmap` (`fmap` f) . p) :: `Parse` b</span><span>
+</span><a name="line-361"></a><span class="hs-comment">--          `fmap` (`fmap` f) . p  :: `String` -&gt; `Either` `String` (`String`, b)</span><span>
+</span><a name="line-362"></a><span class="hs-comment">--          `fmap` (`fmap` f)      :: `Either` `String` (`String`, a) -&gt; `Either` `String` (`String`, b)</span><span>
+</span><a name="line-363"></a><span class="hs-comment">--                `fmap` f       :: (`String`, a) -&gt; (`String`, b)</span><span>
+</span><a name="line-364"></a><span class="hs-comment">--                     f       :: a -&gt; b</span><span>
+</span><a name="line-365"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-366"></a><span class="hs-comment">--</span><span>
+</span><a name="line-367"></a><span class="hs-comment">--  Now, we want to get to the &quot;a&quot; and apply &quot;f&quot; to it so we:</span><span>
+</span><a name="line-368"></a><span class="hs-comment">--</span><span>
+</span><a name="line-369"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-370"></a><span class="hs-comment">--    Compose with _: &quot;_ . p&quot;, where _ :: Either String (String, a) -&gt; Either String (String, b)</span><span>
+</span><a name="line-371"></a><span class="hs-comment">--    fmap _: &quot;fmap _ . p&quot;, where _ :: (String, a) -&gt; (String, b)</span><span>
+</span><a name="line-372"></a><span class="hs-comment">--    fmap _: &quot;fmap (fmap _) . p&quot;, where _ :: a -&gt; b</span><span>
+</span><a name="line-373"></a><span class="hs-comment">--    Now we just need to replace '_' with 'f', which has type &quot;a -&gt; b&quot;!</span><span>
+</span><a name="line-374"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-375"></a><span class="hs-comment">--</span><span>
+</span><a name="line-376"></a><span class="hs-comment">-- Note that `fmap` automatically changes instances twice:</span><span>
+</span><a name="line-377"></a><span class="hs-comment">--</span><span>
+</span><a name="line-378"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-379"></a><span class="hs-comment">--  `fmap` :: ((`String`, a) -&gt; (`String`, b)) -&gt; Either `String` (`String`, a) -&gt; Either `String` (`String`, b)</span><span>
+</span><a name="line-380"></a><span class="hs-comment">--  `fmap` :: (a -&gt; b) -&gt; (`String`, a) -&gt; (`String`, b)</span><span>
+</span><a name="line-381"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-382"></a><span class="hs-comment">--</span><span>
+</span><a name="line-383"></a><span class="hs-comment">-- It's neat, but all this bouncing around with abstractions can be a bit intense. Don't be afraid to take a break here to breathe.</span><span>
+</span><a name="line-384"></a><span>
+</span><a name="line-385"></a><span class="hs-comment">-- $applicative_instance</span><span>
+</span><a name="line-386"></a><span class="hs-comment">-- Now you might be thinking: &quot;ok, ok, but this isn't anything too crazy. I could do that manually without the Functor instance and still be O.K.&quot;</span><span>
+</span><a name="line-387"></a><span class="hs-comment">-- You're right, and I'm not going to pretend that you should use Haskell or monadic parsers just because you can map over different things.</span><span>
+</span><a name="line-388"></a><span class="hs-comment">-- Here's where it starts to get really fun :)</span><span>
+</span><a name="line-389"></a><span class="hs-comment">--</span><span>
+</span><a name="line-390"></a><span class="hs-comment">-- First a use case: What if you had a list of functions ([a -&gt; b]) and a list of elements's ([a]).</span><span>
+</span><a name="line-391"></a><span class="hs-comment">-- Can you apply all the functions to all the elements?</span><span>
+</span><a name="line-392"></a><span class="hs-comment">-- Of course you can! Just do [function1 element1, function1 element2, .., function2 element1..]</span><span>
+</span><a name="line-393"></a><span class="hs-comment">--</span><span>
+</span><a name="line-394"></a><span class="hs-comment">-- Ok so I'm going a lot less in depth for this one. This is called the applicative class and it has two necessary functions:</span><span>
+</span><a name="line-395"></a><span class="hs-comment">--</span><span>
+</span><a name="line-396"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-397"></a><span class="hs-comment">-- pure :: Applicative f =&gt; a -&gt; f a</span><span>
+</span><a name="line-398"></a><span class="hs-comment">-- (&lt;*&gt;) Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b</span><span>
+</span><a name="line-399"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-400"></a><span class="hs-comment">--</span><span>
+</span><a name="line-401"></a><span class="hs-comment">-- Here's another application: you have several parsers and a combinator</span><span>
+</span><a name="line-402"></a><span class="hs-comment">--</span><span>
+</span><a name="line-403"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-404"></a><span class="hs-comment">-- \f x1          -&gt; f `&lt;$&gt;` x1                      :: `Applicative` f =&gt; (                  a1 -&gt; b)                            f a1 -&gt; f b</span><span>
+</span><a name="line-405"></a><span class="hs-comment">-- \f x1 x2       -&gt; f `&lt;$&gt;` x1 `&lt;*&gt;` x2               :: `Applicative` f =&gt; (            a2 -&gt; a1 -&gt; b)                 -&gt; f a2 -&gt; f a1 -&gt; f b</span><span>
+</span><a name="line-406"></a><span class="hs-comment">-- \f x1 x2 x3    -&gt; f `&lt;$&gt;` x1 `&lt;*&gt;` x2 `&lt;*&gt;` x3        :: `Applicative` f =&gt; (      a3 -&gt; a2 -&gt; a1 -&gt; b)         -&gt; f a3 -&gt; f a2 -&gt; f a1 -&gt; f b</span><span>
+</span><a name="line-407"></a><span class="hs-comment">-- \f x1 x2 x3 x4 -&gt; f `&lt;$&gt;` x1 `&lt;*&gt;` x2 `&lt;*&gt;` x3 `&lt;*&gt;` x4 :: `Applicative` f =&gt; (a4 -&gt; a3 -&gt; a2 -&gt; a1 -&gt; b) -&gt; f a4 -&gt; f a3 -&gt; f a2 -&gt; f a1 -&gt; f b</span><span>
+</span><a name="line-408"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-409"></a><span class="hs-comment">--</span><span>
+</span><a name="line-410"></a><span class="hs-comment">-- Do you see the pattern? `Applicative` allows arbitrary extensions of `Functor`.</span><span>
+</span><a name="line-411"></a><span class="hs-comment">--</span><span>
+</span><a name="line-412"></a><span class="hs-comment">-- Here's an example use case:</span><span>
+</span><a name="line-413"></a><span class="hs-comment">--</span><span>
+</span><a name="line-414"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-415"></a><span class="hs-comment">--  (`+`) `&lt;$&gt;` parseInt `&lt;*&gt;` parseInt</span><span>
+</span><a name="line-416"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-417"></a><span class="hs-comment">--</span><span>
+</span><a name="line-418"></a><span class="hs-comment">-- parses two integers and returns their sum.</span><span>
+</span><a name="line-419"></a><span class="hs-comment">--</span><span>
+</span><a name="line-420"></a><span class="hs-comment">-- Or</span><span>
+</span><a name="line-421"></a><span class="hs-comment">--</span><span>
+</span><a name="line-422"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-423"></a><span class="hs-comment">--  (,) `&lt;$&gt;` parseA `&lt;*&gt;` parseB = parseAB</span><span>
+</span><a name="line-424"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-425"></a><span class="hs-comment">--</span><span>
+</span><a name="line-426"></a><span class="hs-comment">-- parses a tuple of @(A, B)@</span><span>
+</span><a name="line-427"></a><span class="hs-comment">--</span><span>
+</span><a name="line-428"></a><span class="hs-comment">--</span><span>
+</span><a name="line-429"></a><span class="hs-comment">-- If they have the above types and follow these rules, it's a valid instance</span><span>
+</span><a name="line-430"></a><span class="hs-comment">--</span><span>
+</span><a name="line-431"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-432"></a><span class="hs-comment">-- identity:     pure id &lt;*&gt; v = v</span><span>
+</span><a name="line-433"></a><span class="hs-comment">--                           = [id] &lt;*&gt; [1,2,3] = [id 1, id 2, id 3] = [1,2,3]</span><span>
+</span><a name="line-434"></a><span class="hs-comment">--</span><span>
+</span><a name="line-435"></a><span class="hs-comment">-- homomorphism: pure f &lt;*&gt; pure x = pure (f x)</span><span>
+</span><a name="line-436"></a><span class="hs-comment">--   = pure f &lt;*&gt; pure x = [f] &lt;*&gt; [x] = [f x] = pure (f x)</span><span>
+</span><a name="line-437"></a><span class="hs-comment">--</span><span>
+</span><a name="line-438"></a><span class="hs-comment">-- composition:  pure (.) &lt;*&gt; u &lt;*&gt; v &lt;*&gt; w = u &lt;*&gt; (v &lt;*&gt; w)</span><span>
+</span><a name="line-439"></a><span class="hs-comment">--</span><span>
+</span><a name="line-440"></a><span class="hs-comment">-- interchange:  u &lt;*&gt; pure y = pure ($ y) &lt;*&gt; u</span><span>
+</span><a name="line-441"></a><span class="hs-comment">--   = u &lt;*&gt; [y] = [u y] = [($ y)] &lt;*&gt; u = pure ($ y) &lt;*&gt; u</span><span>
+</span><a name="line-442"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-443"></a><span class="hs-comment">--</span><span>
+</span><a name="line-444"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-445"></a><span class="hs-comment">-- instance Applicative [] where</span><span>
+</span><a name="line-446"></a><span class="hs-comment">--     pure :: a -&gt; [a]</span><span>
+</span><a name="line-447"></a><span class="hs-comment">--     pure x    = [x]</span><span>
+</span><a name="line-448"></a><span class="hs-comment">--</span><span>
+</span><a name="line-449"></a><span class="hs-comment">--     (&lt;*&gt;) :: [a -&gt; b] -&gt; [a] -&gt; [b]</span><span>
+</span><a name="line-450"></a><span class="hs-comment">--     fs &lt;*&gt; xs = [f x | f &lt;- fs, x &lt;- xs]</span><span>
+</span><a name="line-451"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-452"></a><span>
+</span><a name="line-453"></a><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier hs-type">Applicative</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-454"></a><span>  </span><span class="hs-comment">-- (pure x) is a parser that consumes no input and always returns x</span><span>
+</span><a name="line-455"></a><span>  </span><span class="hs-identifier">pure</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="#local-6989586621679033840"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679033840"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-456"></a><span>  </span><a name="local-3458764513820541680"><span class="hs-identifier">pure</span></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">Right</span><span> </span><span class="hs-operator hs-var">.</span><span class="hs-special">)</span><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-identifier hs-var">flip</span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span>
+</span><a name="line-457"></a><span>  </span><span class="hs-comment">-- pure x = Parser $ \s -&gt; Right (s, x)</span><span>
+</span><a name="line-458"></a><span>
+</span><a name="line-459"></a><span>  </span><span class="hs-comment">-- If the first parser passes, apply its result to the result of the second parser</span><span>
+</span><a name="line-460"></a><span>  </span><span class="hs-comment">-- E.g. Parser (Word -&gt; Definition) -&gt; Parser Word -&gt; Parser Definition</span><span>
+</span><a name="line-461"></a><span>  </span><span class="hs-comment">-- If the first parser reads a dictionary to get &quot;Word -&gt; Definition&quot; mappings</span><span>
+</span><a name="line-462"></a><span>  </span><span class="hs-comment">--  and the second reads a word, they may be combined to make a parser that</span><span>
+</span><a name="line-463"></a><span>  </span><span class="hs-comment">--  reads a word *and* looks up its definition</span><span>
+</span><a name="line-464"></a><span>  </span><span class="hs-comment">--</span><span>
+</span><a name="line-465"></a><span>  </span><span class="hs-comment">-- That means that if either one fails, you will not get a result</span><span>
+</span><a name="line-466"></a><span>  </span><span class="hs-comment">-- One bug I found made it so when looking up the word failed,</span><span>
+</span><a name="line-467"></a><span>  </span><span class="hs-comment">-- the parser forgot to let you know it wasn't able to use the given word</span><span>
+</span><a name="line-468"></a><span>  </span><span class="hs-comment">--</span><span>
+</span><a name="line-469"></a><span>  </span><span class="hs-comment">-- All the code says is:</span><span>
+</span><a name="line-470"></a><span>  </span><span class="hs-comment">--  Given parser1 that parses a function and parser2 that parses an input:</span><span>
+</span><a name="line-471"></a><span>  </span><span class="hs-comment">--  if parser1 succeeds</span><span>
+</span><a name="line-472"></a><span>  </span><span class="hs-comment">--    then run parser2 and if it succeeds</span><span>
+</span><a name="line-473"></a><span>  </span><span class="hs-comment">--      then return parser1_result_function( parser2_result )</span><span>
+</span><a name="line-474"></a><span>  </span><span class="hs-comment">--      else fail</span><span>
+</span><a name="line-475"></a><span>  </span><span class="hs-comment">--    else fail</span><span>
+</span><a name="line-476"></a><span>  </span><span class="hs-comment">--</span><span>
+</span><a name="line-477"></a><span>  </span><span class="hs-special">(</span><span class="hs-operator">&lt;*&gt;</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-special">(</span><a href="#local-6989586621679033841"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="#local-6989586621679033842"><span class="hs-identifier hs-type">b</span></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679033841"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679033842"><span class="hs-identifier hs-type">b</span></a><span>
+</span><a name="line-478"></a><span>  </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><a name="local-6989586621679033843"><a href="#local-6989586621679033843"><span class="hs-identifier">f</span></a></a><span> </span><a name="local-3458764513820541679"><span class="hs-operator">&lt;*&gt;</span></a><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><a name="local-6989586621679033844"><a href="#local-6989586621679033844"><span class="hs-identifier">x</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><span class="hs-operator hs-var">$</span><span> </span><a href="#local-6989586621679033845"><span class="hs-identifier hs-var">combine</span></a><span> </span><span class="hs-operator hs-var">.</span><span> </span><a href="#local-6989586621679033843"><span class="hs-identifier hs-var">f</span></a><span>
+</span><a name="line-479"></a><span>    </span><span class="hs-keyword">where</span><span>
+</span><a name="line-480"></a><span>      </span><a name="local-6989586621679033845"><a href="#local-6989586621679033845"><span class="hs-identifier">combine</span></a></a><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">Left</span><span>   </span><a name="local-6989586621679033846"><a href="#local-6989586621679033846"><span class="hs-identifier">s1</span></a></a><span>     </span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">Left</span><span>      </span><a href="#local-6989586621679033846"><span class="hs-identifier hs-var">s1</span></a><span>
+</span><a name="line-481"></a><span>      </span><span class="hs-identifier">combine</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">Right</span><span> </span><span class="hs-special">(</span><a name="local-6989586621679033847"><a href="#local-6989586621679033847"><span class="hs-identifier">s2</span></a></a><span class="hs-special">,</span><span> </span><a name="local-6989586621679033848"><a href="#local-6989586621679033848"><span class="hs-identifier">f'</span></a></a><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">fmap</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">fmap</span><span> </span><a href="#local-6989586621679033848"><span class="hs-identifier hs-var">f'</span></a><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><a href="#local-6989586621679033844"><span class="hs-identifier hs-var">x</span></a><span> </span><a href="#local-6989586621679033847"><span class="hs-identifier hs-var">s2</span></a><span class="hs-special">)</span><span>
+</span><a name="line-482"></a><span>
+</span><a name="line-483"></a><span>
+</span><a name="line-484"></a><span class="hs-comment">-- $applicative_parse</span><span>
+</span><a name="line-485"></a><span class="hs-comment">-- Now for the actual instance for `Parse`:</span><span>
+</span><a name="line-486"></a><span class="hs-comment">--</span><span>
+</span><a name="line-487"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-488"></a><span class="hs-comment">-- instance `Applicative` `Parse` where</span><span>
+</span><a name="line-489"></a><span class="hs-comment">--   -- @`pure` x@ is a parser that consumes no input and always returns @x@</span><span>
+</span><a name="line-490"></a><span class="hs-comment">--   `pure` :: a -&gt; `Parse` a</span><span>
+</span><a name="line-491"></a><span class="hs-comment">--   `pure` = `Parser` `.` (`Right` `.`) `.` `flip` (,)</span><span>
+</span><a name="line-492"></a><span class="hs-comment">--   -- here's an alternative implementation:</span><span>
+</span><a name="line-493"></a><span class="hs-comment">--   -- `pure` x = `Parser` $ \s -&gt; `Right` (s, x)</span><span>
+</span><a name="line-494"></a><span class="hs-comment">--</span><span>
+</span><a name="line-495"></a><span class="hs-comment">--   -- If the first parser passes, apply its result to the result of the second parser</span><span>
+</span><a name="line-496"></a><span class="hs-comment">--   -- E.g. @`Parse` (Word -&gt; Definition) -&gt; `Parse` Word -&gt; `Parse` Definition@</span><span>
+</span><a name="line-497"></a><span class="hs-comment">--</span><span>
+</span><a name="line-498"></a><span class="hs-comment">--   -- If the first parser reads a dictionary to get @Word -&gt; Definition@ mappings</span><span>
+</span><a name="line-499"></a><span class="hs-comment">--   --  and the second reads a word, they may be combined to make a parser that</span><span>
+</span><a name="line-500"></a><span class="hs-comment">--   --  reads a word *and* looks up its definition.</span><span>
+</span><a name="line-501"></a><span class="hs-comment">--   --</span><span>
+</span><a name="line-502"></a><span class="hs-comment">--   -- That means that if either one fails, you will not get a result.</span><span>
+</span><a name="line-503"></a><span class="hs-comment">--   -- (One bug I found made it so when looking up the word failed,</span><span>
+</span><a name="line-504"></a><span class="hs-comment">--   -- the parser forgot to let you know it wasn't able to use the given word.)</span><span>
+</span><a name="line-505"></a><span class="hs-comment">--   --</span><span>
+</span><a name="line-506"></a><span class="hs-comment">--   -- All the code says is:</span><span>
+</span><a name="line-507"></a><span class="hs-comment">--   --  Given parser1 that parses a function and parser2 that parses an input:</span><span>
+</span><a name="line-508"></a><span class="hs-comment">--   --  if parser1 succeeds</span><span>
+</span><a name="line-509"></a><span class="hs-comment">--   --    then run parser2 and if it succeeds</span><span>
+</span><a name="line-510"></a><span class="hs-comment">--   --      then return parser1_result_function( parser2_result )</span><span>
+</span><a name="line-511"></a><span class="hs-comment">--   --      else fail</span><span>
+</span><a name="line-512"></a><span class="hs-comment">--   --    else fail</span><span>
+</span><a name="line-513"></a><span class="hs-comment">--   --</span><span>
+</span><a name="line-514"></a><span class="hs-comment">--   (&lt;*&gt;) :: `Parse` (a -&gt; b) -&gt; `Parse` a -&gt; `Parse` b</span><span>
+</span><a name="line-515"></a><span class="hs-comment">--   `Parser` f `&lt;*&gt;` `Parser` x = `Parser` `$` combine `.` f</span><span>
+</span><a name="line-516"></a><span class="hs-comment">--     where</span><span>
+</span><a name="line-517"></a><span class="hs-comment">--       combine (`Left`   s1     ) = `Left`      s1</span><span>
+</span><a name="line-518"></a><span class="hs-comment">--       combine (`Right` (s2, f')) = `fmap` (`fmap` f') (x s2)</span><span>
+</span><a name="line-519"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-520"></a><span>
+</span><a name="line-521"></a><span>
+</span><a name="line-522"></a><span>
+</span><a name="line-523"></a><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier hs-type">Monad</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-524"></a><span>  </span><span class="hs-comment">-- Still just a parser that returns its argument, no matter what</span><span>
+</span><a name="line-525"></a><span>  </span><a name="local-3458764513820541102"><span class="hs-identifier">return</span></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">pure</span><span>
+</span><a name="line-526"></a><span>
+</span><a name="line-527"></a><span>  </span><span class="hs-comment">-- This is very similar to (&lt;*&gt;)</span><span>
+</span><a name="line-528"></a><span>  </span><span class="hs-comment">-- What it does is runs parser1, then passes the result to the function to get a new parser</span><span>
+</span><a name="line-529"></a><span>  </span><span class="hs-comment">-- E.g. Parser Password -&gt; (Password -&gt; Parser Secret) -&gt; Parser Secret</span><span>
+</span><a name="line-530"></a><span>  </span><span class="hs-comment">-- The first parser reads the password and the second can read a secret</span><span>
+</span><a name="line-531"></a><span>  </span><span class="hs-comment">--  if it has the password. These can be combined to make something that</span><span>
+</span><a name="line-532"></a><span>  </span><span class="hs-comment">--  parses the password and the secret, returning the secret.</span><span>
+</span><a name="line-533"></a><span>  </span><span class="hs-comment">--</span><span>
+</span><a name="line-534"></a><span>  </span><span class="hs-comment">--  This again means that if either fails, you will not get the result.</span><span>
+</span><a name="line-535"></a><span>  </span><span class="hs-comment">--</span><span>
+</span><a name="line-536"></a><span>  </span><span class="hs-comment">--  All the code says is:</span><span>
+</span><a name="line-537"></a><span>  </span><span class="hs-comment">--    Given a parser and a function that can make a new parser out of its result:</span><span>
+</span><a name="line-538"></a><span>  </span><span class="hs-comment">--    If the parser succeeds</span><span>
+</span><a name="line-539"></a><span>  </span><span class="hs-comment">--      then</span><span>
+</span><a name="line-540"></a><span>  </span><span class="hs-comment">--        make a new parser with its result and the function</span><span>
+</span><a name="line-541"></a><span>  </span><span class="hs-comment">--        run the new parser</span><span>
+</span><a name="line-542"></a><span>  </span><span class="hs-comment">--        return the result</span><span>
+</span><a name="line-543"></a><span>  </span><span class="hs-comment">--      else</span><span>
+</span><a name="line-544"></a><span>  </span><span class="hs-comment">--        fail</span><span>
+</span><a name="line-545"></a><span>  </span><span class="hs-comment">--</span><span>
+</span><a name="line-546"></a><span>  </span><span class="hs-special">(</span><span class="hs-operator">&gt;&gt;=</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679033833"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><a href="#local-6989586621679033833"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679033834"><span class="hs-identifier hs-type">b</span></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679033834"><span class="hs-identifier hs-type">b</span></a><span>
+</span><a name="line-547"></a><span>  </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><a name="local-6989586621679033835"><a href="#local-6989586621679033835"><span class="hs-identifier">x</span></a></a><span> </span><a name="local-3458764513820541099"><span class="hs-operator">&gt;&gt;=</span></a><span> </span><a name="local-6989586621679033836"><a href="#local-6989586621679033836"><span class="hs-identifier">f</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><span class="hs-operator hs-var">$</span><span> </span><span class="hs-glyph">\</span><a name="local-6989586621679033837"><a href="#local-6989586621679033837"><span class="hs-identifier">s</span></a></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="#local-6989586621679033835"><span class="hs-identifier hs-var">x</span></a><span> </span><a href="#local-6989586621679033837"><span class="hs-identifier hs-var">s</span></a><span> </span><span class="hs-operator hs-var">&gt;&gt;=</span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><a name="local-6989586621679033838"><a href="#local-6989586621679033838"><span class="hs-identifier">s'</span></a></a><span class="hs-special">,</span><span> </span><a name="local-6989586621679033839"><a href="#local-6989586621679033839"><span class="hs-identifier">y</span></a></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier hs-var">either</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">const</span><span> </span><span class="hs-operator hs-var">$</span><span> </span><span class="hs-identifier hs-var">Left</span><span> </span><a href="#local-6989586621679033837"><span class="hs-identifier hs-var">s</span></a><span class="hs-special">)</span><span> </span><span class="hs-identifier hs-var">Right</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">runParser</span><span> </span><span class="hs-special">(</span><a href="#local-6989586621679033836"><span class="hs-identifier hs-var">f</span></a><span> </span><a href="#local-6989586621679033839"><span class="hs-identifier hs-var">y</span></a><span class="hs-special">)</span><span> </span><a href="#local-6989586621679033838"><span class="hs-identifier hs-var">s'</span></a><span class="hs-special">)</span><span>
+</span><a name="line-548"></a><span>
+</span><a name="line-549"></a><span>
+</span><a name="line-550"></a><span class="hs-comment">-- $monad_instance</span><span>
+</span><a name="line-551"></a><span class="hs-comment">-- Here's one way to understand the bind function (`&gt;&gt;=`):</span><span>
+</span><a name="line-552"></a><span class="hs-comment">--</span><span>
+</span><a name="line-553"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-554"></a><span class="hs-comment">-- (`&gt;&gt;=`)    :: t a -&gt; (a -&gt; t b) -&gt; t b</span><span>
+</span><a name="line-555"></a><span class="hs-comment">-- passedTo ::   a -&gt; (a -&gt;   b) -&gt;   b</span><span>
+</span><a name="line-556"></a><span class="hs-comment">-- x \`passedTo\` f = f x</span><span>
+</span><a name="line-557"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-558"></a><span class="hs-comment">--</span><span>
+</span><a name="line-559"></a><span class="hs-comment">-- That is, bind is just 'passedTo' where the function result is somehow encapsulated</span><span>
+</span><a name="line-560"></a><span class="hs-comment">-- You may not be able to break the encapsulation, but you can often still apply a function.</span><span>
+</span><a name="line-561"></a><span class="hs-comment">--</span><span>
+</span><a name="line-562"></a><span class="hs-comment">-- Here's an example:</span><span>
+</span><a name="line-563"></a><span class="hs-comment">--</span><span>
+</span><a name="line-564"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-565"></a><span class="hs-comment">--  (`&gt;&gt;=`) :: `Either` Cat Dog -&gt; (Dog -&gt; `Either` Cat Dog) -&gt; `Either` Cat Dog</span><span>
+</span><a name="line-566"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-567"></a><span class="hs-comment">--</span><span>
+</span><a name="line-568"></a><span class="hs-comment">-- What happens if we have the following?</span><span>
+</span><a name="line-569"></a><span class="hs-comment">--</span><span>
+</span><a name="line-570"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-571"></a><span class="hs-comment">-- (`&gt;&gt;=`) (`Left` someCat) :: (Dog -&gt; `Either` Cat Dog) -&gt; `Either` Cat Dog</span><span>
+</span><a name="line-572"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-573"></a><span class="hs-comment">--</span><span>
+</span><a name="line-574"></a><span class="hs-comment">-- Well, there's no obvious way to convert a Cat into a Dog, so a reasonable default</span><span>
+</span><a name="line-575"></a><span class="hs-comment">-- is to skip the @Dog -&gt; Either Cat Dog@ and return @`Left` someCat@.</span><span>
+</span><a name="line-576"></a><span class="hs-comment">--</span><span>
+</span><a name="line-577"></a><span class="hs-comment">-- In other words, there's likely no good function with the type @`Either` Cat Dog -&gt; Dog@,</span><span>
+</span><a name="line-578"></a><span class="hs-comment">-- since we could have a Cat.</span><span>
+</span><a name="line-579"></a><span class="hs-comment">--</span><span>
+</span><a name="line-580"></a><span class="hs-comment">-- Thus a sane implementation (actually the default definition for Haskell) for (`&gt;&gt;=`) on `Either`</span><span>
+</span><a name="line-581"></a><span class="hs-comment">-- is the following:</span><span>
+</span><a name="line-582"></a><span class="hs-comment">--</span><span>
+</span><a name="line-583"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-584"></a><span class="hs-comment">-- (`&gt;&gt;=`) (`Left`  l) f = `Left`     x</span><span>
+</span><a name="line-585"></a><span class="hs-comment">-- (`&gt;&gt;=`) (`Right` r) f = `Right` (f x)</span><span>
+</span><a name="line-586"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-587"></a><span class="hs-comment">--</span><span>
+</span><a name="line-588"></a><span class="hs-comment">-- Luckily, this is almost all we need to make a `Monad` instance for `Parse`:</span><span>
+</span><a name="line-589"></a><span class="hs-comment">--</span><span>
+</span><a name="line-590"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-591"></a><span class="hs-comment">-- instance `Monad` `Parse` where</span><span>
+</span><a name="line-592"></a><span class="hs-comment">--   -- Still just a parser that returns its argument, no matter what</span><span>
+</span><a name="line-593"></a><span class="hs-comment">--   `return` :: a -&gt; `Parse` a</span><span>
+</span><a name="line-594"></a><span class="hs-comment">--   `return` = `pure`</span><span>
+</span><a name="line-595"></a><span class="hs-comment">--</span><span>
+</span><a name="line-596"></a><span class="hs-comment">--   -- This is somewhat similar to (`&lt;*&gt;`)</span><span>
+</span><a name="line-597"></a><span class="hs-comment">--   --</span><span>
+</span><a name="line-598"></a><span class="hs-comment">--   -- What it does is runs parser1, then passes the result to the function to get a new parser</span><span>
+</span><a name="line-599"></a><span class="hs-comment">--   --   E.g. `Parser` Password -&gt; (Password -&gt; `Parser` Secret) -&gt; `Parser` Secret</span><span>
+</span><a name="line-600"></a><span class="hs-comment">--   -- The first parser reads the password and the second can read a secret</span><span>
+</span><a name="line-601"></a><span class="hs-comment">--   --  if it has the password. These can be combined to make something that</span><span>
+</span><a name="line-602"></a><span class="hs-comment">--   --  parses the password and the secret, returning the secret.</span><span>
+</span><a name="line-603"></a><span class="hs-comment">--   --</span><span>
+</span><a name="line-604"></a><span class="hs-comment">--   --  This again means that if either fails, you will not get the result.</span><span>
+</span><a name="line-605"></a><span class="hs-comment">--   --</span><span>
+</span><a name="line-606"></a><span class="hs-comment">--   --  All the code says is:</span><span>
+</span><a name="line-607"></a><span class="hs-comment">--   --    Given a parser and a function that can make a new parser out of its result:</span><span>
+</span><a name="line-608"></a><span class="hs-comment">--   --    If the parser succeeds</span><span>
+</span><a name="line-609"></a><span class="hs-comment">--   --      then</span><span>
+</span><a name="line-610"></a><span class="hs-comment">--   --        make a new parser with its result and the function</span><span>
+</span><a name="line-611"></a><span class="hs-comment">--   --        run the new parser</span><span>
+</span><a name="line-612"></a><span class="hs-comment">--   --        return the result</span><span>
+</span><a name="line-613"></a><span class="hs-comment">--   --      else</span><span>
+</span><a name="line-614"></a><span class="hs-comment">--   --        fail</span><span>
+</span><a name="line-615"></a><span class="hs-comment">--   --</span><span>
+</span><a name="line-616"></a><span class="hs-comment">--   (`&gt;&gt;=`) :: `Parse` a -&gt; (a -&gt; `Parse` b) -&gt; `Parse` b</span><span>
+</span><a name="line-617"></a><span class="hs-comment">--   `Parser` x &gt;&gt;= f = Parser $ \s -&gt; x s &gt;&gt;= \(s', y) -&gt; either (const $ Left s) Right (runParser (f y) s')</span><span>
+</span><a name="line-618"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-619"></a><span>
+</span><a name="line-620"></a><span>
+</span><a name="line-621"></a><span class="hs-comment">-- $io_is_monad</span><span>
+</span><a name="line-622"></a><span class="hs-comment">-- You might now be scratching your head, remembering that the weird `IO` type in Haskell is a monad.</span><span>
+</span><a name="line-623"></a><span class="hs-comment">--</span><span>
+</span><a name="line-624"></a><span class="hs-comment">-- Without getting too off track, here's a brief explanation:</span><span>
+</span><a name="line-625"></a><span class="hs-comment">--</span><span>
+</span><a name="line-626"></a><span class="hs-comment">-- The `Monad` instance for functions like @(a -&gt; b)@ has a bind with type:</span><span>
+</span><a name="line-627"></a><span class="hs-comment">--</span><span>
+</span><a name="line-628"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-629"></a><span class="hs-comment">-- (Think that &quot;t&quot; equals &quot;function that returns b&quot; here)</span><span>
+</span><a name="line-630"></a><span class="hs-comment">-- (`&gt;&gt;=`) :: (a -&gt; b) -&gt; (a1 -&gt; a -&gt; b) -&gt; a1 -&gt; b</span><span>
+</span><a name="line-631"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-632"></a><span class="hs-comment">--</span><span>
+</span><a name="line-633"></a><span class="hs-comment">-- So then a simple implementation is</span><span>
+</span><a name="line-634"></a><span class="hs-comment">--</span><span>
+</span><a name="line-635"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-636"></a><span class="hs-comment">-- (`&gt;&gt;=`) f g = \x -&gt; g x (f x)</span><span>
+</span><a name="line-637"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-638"></a><span class="hs-comment">--</span><span>
+</span><a name="line-639"></a><span class="hs-comment">-- This also turns out to be the default implementaion in Haskell.</span><span>
+</span><a name="line-640"></a><span class="hs-comment">--</span><span>
+</span><a name="line-641"></a><span class="hs-comment">-- Where am I going with this? Well, part of the idea behind `IO` in Haskell is that</span><span>
+</span><a name="line-642"></a><span class="hs-comment">-- `IO` actions may be order sensitive, so you need to make sure they're strung up in a row.</span><span>
+</span><a name="line-643"></a><span class="hs-comment">--</span><span>
+</span><a name="line-644"></a><span class="hs-comment">-- How do you string up a bunch of effects? Why, might as well have them pass something along, to make sure they're sequenced.</span><span>
+</span><a name="line-645"></a><span class="hs-comment">-- That's exactly how `IO` is implemented behind the scenes (with slightly different names):</span><span>
+</span><a name="line-646"></a><span class="hs-comment">--</span><span>
+</span><a name="line-647"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-648"></a><span class="hs-comment">-- data IO a = State RealWorld -&gt; (State RealWorld, a)</span><span>
+</span><a name="line-649"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-650"></a><span class="hs-comment">--</span><span>
+</span><a name="line-651"></a><span class="hs-comment">-- Some people have said that this isn't pretty or should be hidden from users (it's pretty hard to find in the source).</span><span>
+</span><a name="line-652"></a><span class="hs-comment">-- However, I think that with it, `IO` makes perfect sense. You use monads for `IO` because they're an easy way to sequence these</span><span>
+</span><a name="line-653"></a><span class="hs-comment">-- sorts of functions. So look at the type of bind for `IO` then translated:</span><span>
+</span><a name="line-654"></a><span class="hs-comment">--</span><span>
+</span><a name="line-655"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-656"></a><span class="hs-comment">-- (`&gt;&gt;=`) :: `IO` a -&gt; (a -&gt; `IO` b) -&gt; `IO` b</span><span>
+</span><a name="line-657"></a><span class="hs-comment">-- (`&gt;&gt;=`) :: (State RealWorld -&gt; (State RealWorld, a)) -&gt; (a -&gt; State RealWorld -&gt; (State RealWorld, b)) -&gt; State RealWorld -&gt; (State RealWorld, b)</span><span>
+</span><a name="line-658"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-659"></a><span class="hs-comment">--</span><span>
+</span><a name="line-660"></a><span class="hs-comment">-- It's pretty verbose, but compare this to:</span><span>
+</span><a name="line-661"></a><span class="hs-comment">--</span><span>
+</span><a name="line-662"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-663"></a><span class="hs-comment">-- (`&gt;&gt;=`) :: (s               -&gt;                   a ) -&gt; (a -&gt; s               -&gt;                   b ) -&gt; s               -&gt;                   b</span><span>
+</span><a name="line-664"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-665"></a><span class="hs-comment">--</span><span>
+</span><a name="line-666"></a><span class="hs-comment">-- The parallels are clear!</span><span>
+</span><a name="line-667"></a><span>
+</span><a name="line-668"></a><span>
+</span><a name="line-669"></a><span class="hs-comment">-- $alternative_instance</span><span>
+</span><a name="line-670"></a><span class="hs-comment">-- Don't forget an alternative instance + explanation!</span><span>
+</span><a name="line-671"></a><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier hs-type">Alternative</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-672"></a><span>  </span><a name="local-8214565720323791536"><span class="hs-identifier">empty</span></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><span class="hs-identifier hs-var">Left</span><span>
+</span><a name="line-673"></a><span>  </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><a name="local-6989586621679033830"><a href="#local-6989586621679033830"><span class="hs-identifier">x</span></a></a><span> </span><a name="local-8214565720323791535"><span class="hs-operator">&lt;|&gt;</span></a><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><a name="local-6989586621679033831"><a href="#local-6989586621679033831"><span class="hs-identifier">y</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><a name="local-6989586621679033832"><a href="#local-6989586621679033832"><span class="hs-identifier">s</span></a></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="#local-6989586621679033830"><span class="hs-identifier hs-var">x</span></a><span> </span><a href="#local-6989586621679033832"><span class="hs-identifier hs-var">s</span></a><span> </span><span class="hs-operator hs-var">&lt;|&gt;</span><span> </span><a href="#local-6989586621679033831"><span class="hs-identifier hs-var">y</span></a><span> </span><a href="#local-6989586621679033832"><span class="hs-identifier hs-var">s</span></a><span class="hs-special">)</span><span>
+</span><a name="line-674"></a><span>
+</span><a name="line-675"></a><span>
+</span><a name="line-676"></a><span class="hs-comment">-- | All you do to run a parser is pull the function out of</span><span>
+</span><a name="line-677"></a><span class="hs-comment">-- the 'Parse' type, run it on the string, and drop the leftovers</span><span>
+</span><a name="line-678"></a><span class="hs-comment">-- It would be nice to have it return an error, but it would get</span><span>
+</span><a name="line-679"></a><span class="hs-comment">-- more messy and this is supposed to be a pretty clean introduction.</span><span>
+</span><a name="line-680"></a><span class="hs-comment">--</span><span>
+</span><a name="line-681"></a><span class="hs-comment">-- Here's a verbose implementation:</span><span>
+</span><a name="line-682"></a><span class="hs-comment">--</span><span>
+</span><a name="line-683"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-684"></a><span class="hs-comment">--  `parse` (`Parser` p) s = mapEither onlySecond (p s)</span><span>
+</span><a name="line-685"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-686"></a><span class="hs-comment">--</span><span>
+</span><a name="line-687"></a><span class="hs-comment">-- or my actual Haskell implementaion:</span><span>
+</span><a name="line-688"></a><span class="hs-comment">--</span><span>
+</span><a name="line-689"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-690"></a><span class="hs-comment">--  `parse` = `fmap` (`fmap` `snd`) `.` `runParser`</span><span>
+</span><a name="line-691"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-692"></a><span class="hs-identifier">parse</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679031346"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span class="hs-identifier hs-type">String</span><span> </span><span class="hs-glyph">-&gt;</span><span class="hs-identifier hs-type">Either</span><span> </span><span class="hs-identifier hs-type">String</span><span> </span><a href="#local-6989586621679031346"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-693"></a><a name="parse"><a href="Tutorial.html#parse"><span class="hs-identifier">parse</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">fmap</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">fmap</span><span> </span><span class="hs-identifier hs-var">snd</span><span class="hs-special">)</span><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-identifier">runParser</span><span>
+</span><a name="line-694"></a><span>
+</span><a name="line-695"></a><span>
+</span><a name="line-696"></a><span class="hs-comment">-- $writing_actual_parsers</span><span>
+</span><a name="line-697"></a><span class="hs-comment">-- Ok, so we have a nice background on Functors, Applicatives, Monads, and how they apply to parsing.</span><span>
+</span><a name="line-698"></a><span class="hs-comment">-- Now what? I'll begin by defining a single parser &quot;by hand&quot; (without all these nice classes) and show</span><span>
+</span><a name="line-699"></a><span class="hs-comment">-- what can be done with it.</span><span>
+</span><a name="line-700"></a><span>
+</span><a name="line-701"></a><span>
+</span><a name="line-702"></a><span class="hs-comment">-- | Accept any `Char` the predicate passes for</span><span>
+</span><a name="line-703"></a><span class="hs-comment">-- Here's how this works: `charP` takes a test or &quot;predicate&quot;.</span><span>
+</span><a name="line-704"></a><span class="hs-comment">--</span><span>
+</span><a name="line-705"></a><span class="hs-comment">-- When the parser is run, if the test passes for the first character in the string</span><span>
+</span><a name="line-706"></a><span class="hs-comment">-- then return the character and the rest of the string as leftover.</span><span>
+</span><a name="line-707"></a><span class="hs-comment">-- If the test fails or there is no first character, then it fails.</span><span>
+</span><a name="line-708"></a><span class="hs-comment">--</span><span>
+</span><a name="line-709"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-710"></a><span class="hs-comment">--  `charP` p = `Parser` go</span><span>
+</span><a name="line-711"></a><span class="hs-comment">--    where</span><span>
+</span><a name="line-712"></a><span class="hs-comment">--      go [] = `Left` []</span><span>
+</span><a name="line-713"></a><span class="hs-comment">--      go (c:cs) | p c       = `Right` (cs, c )</span><span>
+</span><a name="line-714"></a><span class="hs-comment">--                | `otherwise` = `Left`  (c : cs)</span><span>
+</span><a name="line-715"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-716"></a><span class="hs-identifier">charP</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-type">Char</span><span> </span><span class="hs-glyph">-&gt;</span><span class="hs-identifier hs-type">Bool</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-717"></a><a name="charP"><a href="Tutorial.html#charP"><span class="hs-identifier">charP</span></a></a><span> </span><a name="local-6989586621679032613"><a href="#local-6989586621679032613"><span class="hs-identifier">p</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><a href="#local-6989586621679032614"><span class="hs-identifier hs-var">go</span></a><span>
+</span><a name="line-718"></a><span>  </span><span class="hs-keyword">where</span><span>
+</span><a name="line-719"></a><span>    </span><a name="local-6989586621679032614"><a href="#local-6989586621679032614"><span class="hs-identifier">go</span></a></a><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">Left</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><a name="line-720"></a><span>    </span><span class="hs-identifier">go</span><span> </span><span class="hs-special">(</span><a name="local-6989586621679032615"><a href="#local-6989586621679032615"><span class="hs-identifier">c</span></a></a><span class="hs-glyph">:</span><a name="local-6989586621679032616"><a href="#local-6989586621679032616"><span class="hs-identifier">cs</span></a></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">|</span><span> </span><a href="#local-6989586621679032613"><span class="hs-identifier hs-var">p</span></a><span> </span><a href="#local-6989586621679032615"><span class="hs-identifier hs-var">c</span></a><span>       </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">Right</span><span> </span><span class="hs-special">(</span><a href="#local-6989586621679032616"><span class="hs-identifier hs-var">cs</span></a><span class="hs-special">,</span><span> </span><a href="#local-6989586621679032615"><span class="hs-identifier hs-var">c</span></a><span> </span><span class="hs-special">)</span><span>
+</span><a name="line-721"></a><span>              </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier hs-var">otherwise</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">Left</span><span>  </span><span class="hs-special">(</span><a href="#local-6989586621679032615"><span class="hs-identifier hs-var">c</span></a><span> </span><span class="hs-glyph">:</span><span> </span><a href="#local-6989586621679032616"><span class="hs-identifier hs-var">cs</span></a><span class="hs-special">)</span><span>
+</span><a name="line-722"></a><span>
+</span><a name="line-723"></a><span class="hs-comment">-- | Match the specified `Char`</span><span>
+</span><a name="line-724"></a><span class="hs-comment">--</span><span>
+</span><a name="line-725"></a><span class="hs-comment">-- (This is just @`charP` (`==` givenCharacter)@)</span><span>
+</span><a name="line-726"></a><span class="hs-comment">--</span><span>
+</span><a name="line-727"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-728"></a><span class="hs-comment">--  `char` = `charP` `.` (`==`)</span><span>
+</span><a name="line-729"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-730"></a><span class="hs-identifier">char</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Char</span><span> </span><span class="hs-glyph">-&gt;</span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-731"></a><a name="char"><a href="Tutorial.html#char"><span class="hs-identifier">char</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#charP"><span class="hs-identifier hs-var">charP</span></a><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-special">(</span><span class="hs-operator hs-var">==</span><span class="hs-special">)</span><span>
+</span><a name="line-732"></a><span>
+</span><a name="line-733"></a><span class="hs-comment">-- | Match any digit `Char</span><span>
+</span><a name="line-734"></a><span class="hs-comment">--</span><span>
+</span><a name="line-735"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-736"></a><span class="hs-comment">--  `digit` = `charP` `isDigit`</span><span>
+</span><a name="line-737"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-738"></a><span class="hs-identifier">digit</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-739"></a><a name="digit"><a href="Tutorial.html#digit"><span class="hs-identifier">digit</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#charP"><span class="hs-identifier hs-var">charP</span></a><span> </span><span class="hs-identifier hs-var">isDigit</span><span>
+</span><a name="line-740"></a><span>
+</span><a name="line-741"></a><span class="hs-comment">-- | Since @`const` `True`@ is a function that always returns `True`,</span><span>
+</span><a name="line-742"></a><span class="hs-comment">-- this parses any single character</span><span>
+</span><a name="line-743"></a><span class="hs-comment">--</span><span>
+</span><a name="line-744"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-745"></a><span class="hs-comment">--  `anyChar` = `charP` (`const` `True`)</span><span>
+</span><a name="line-746"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-747"></a><span class="hs-identifier">anyChar</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-748"></a><a name="anyChar"><a href="Tutorial.html#anyChar"><span class="hs-identifier">anyChar</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#charP"><span class="hs-identifier hs-var">charP</span></a><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">const</span><span> </span><span class="hs-identifier hs-var">True</span><span class="hs-special">)</span><span>
+</span><a name="line-749"></a><span>
+</span><a name="line-750"></a><span>
+</span><a name="line-751"></a><span class="hs-comment">-- | Succeeds only if the provided parser fails</span><span>
+</span><a name="line-752"></a><span class="hs-comment">-- (does not consume any input).</span><span>
+</span><a name="line-753"></a><span class="hs-comment">-- What this does is run the given parser (@p@):</span><span>
+</span><a name="line-754"></a><span class="hs-comment">--</span><span>
+</span><a name="line-755"></a><span class="hs-comment">--  If @p@ succeeds, then this parser fails, rewinding the input to before @p@</span><span>
+</span><a name="line-756"></a><span class="hs-comment">--</span><span>
+</span><a name="line-757"></a><span class="hs-comment">--  If @p@ fails, then this parser succeeds and returns all of the input as leftovers</span><span>
+</span><a name="line-758"></a><span class="hs-comment">--</span><span>
+</span><a name="line-759"></a><span class="hs-comment">-- Note that we never defined `mapM`. That's because we get it for free by defining `return` and (`&gt;&gt;=`).</span><span>
+</span><a name="line-760"></a><span class="hs-comment">--</span><span>
+</span><a name="line-761"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-762"></a><span class="hs-comment">-- `notP` p = `Parser` $ `runParser` p `&gt;&gt;=` go</span><span>
+</span><a name="line-763"></a><span class="hs-comment">--   where</span><span>
+</span><a name="line-764"></a><span class="hs-comment">--     go (`Left` _) s = `Right` (s, `()`)</span><span>
+</span><a name="line-765"></a><span class="hs-comment">--     go       _  s = `Left`   s</span><span>
+</span><a name="line-766"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-767"></a><span class="hs-identifier">notP</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679031345"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><a name="line-768"></a><a name="notP"><a href="Tutorial.html#notP"><span class="hs-identifier">notP</span></a></a><span> </span><a name="local-6989586621679032894"><a href="#local-6989586621679032894"><span class="hs-identifier">p</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#Parser"><span class="hs-identifier hs-var">Parser</span></a><span> </span><span class="hs-operator hs-var">$</span><span> </span><span class="hs-identifier">runParser</span><span> </span><a href="#local-6989586621679032894"><span class="hs-identifier hs-var">p</span></a><span> </span><span class="hs-operator hs-var">&gt;&gt;=</span><span> </span><a href="#local-6989586621679032895"><span class="hs-identifier hs-var">go</span></a><span>
+</span><a name="line-769"></a><span>  </span><span class="hs-keyword">where</span><span>
+</span><a name="line-770"></a><span>    </span><a name="local-6989586621679032895"><a href="#local-6989586621679032895"><span class="hs-identifier">go</span></a></a><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">Left</span><span> </span><span class="hs-identifier">_</span><span class="hs-special">)</span><span> </span><a name="local-6989586621679032896"><a href="#local-6989586621679032896"><span class="hs-identifier">s</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">Right</span><span> </span><span class="hs-special">(</span><a href="#local-6989586621679032896"><span class="hs-identifier hs-var">s</span></a><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><a name="line-771"></a><span>    </span><span class="hs-identifier">go</span><span>       </span><span class="hs-identifier">_</span><span>  </span><a name="local-6989586621679032897"><a href="#local-6989586621679032897"><span class="hs-identifier">s</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">Left</span><span>   </span><a href="#local-6989586621679032897"><span class="hs-identifier hs-var">s</span></a><span>
+</span><a name="line-772"></a><span>
+</span><a name="line-773"></a><span class="hs-comment">-- | `mapM` maps the function and combines all the monads inside.</span><span>
+</span><a name="line-774"></a><span class="hs-comment">--</span><span>
+</span><a name="line-775"></a><span class="hs-comment">-- For example:</span><span>
+</span><a name="line-776"></a><span class="hs-comment">--</span><span>
+</span><a name="line-777"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-778"></a><span class="hs-comment">--  `map` `char` ['a', 'b', 'c'] = [`char` 'a', `char` 'b', `char` 'c']</span><span>
+</span><a name="line-779"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-780"></a><span class="hs-comment">--</span><span>
+</span><a name="line-781"></a><span class="hs-comment">-- This isn't too helpful since now we have to somehow run all the `char`</span><span>
+</span><a name="line-782"></a><span class="hs-comment">-- parsers and collect the results. `mapM` does exactly this (remember that @`String` = [`Char`]@).</span><span>
+</span><a name="line-783"></a><span class="hs-comment">--</span><span>
+</span><a name="line-784"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-785"></a><span class="hs-comment">--  `string` = `mapM` `char`</span><span>
+</span><a name="line-786"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-787"></a><span class="hs-identifier">string</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">String</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-identifier hs-type">String</span><span>
+</span><a name="line-788"></a><a name="string"><a href="Tutorial.html#string"><span class="hs-identifier">string</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">mapM</span><span> </span><a href="Tutorial.html#char"><span class="hs-identifier hs-var">char</span></a><span>
+</span><a name="line-789"></a><span>
+</span><a name="line-790"></a><span class="hs-comment">-- | Parse any `Char` in the given `String`</span><span>
+</span><a name="line-791"></a><span class="hs-identifier">elemP</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">String</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-792"></a><a name="elemP"><a href="Tutorial.html#elemP"><span class="hs-identifier">elemP</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#charP"><span class="hs-identifier hs-var">charP</span></a><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-identifier hs-var">flip</span><span> </span><span class="hs-identifier hs-var">elem</span><span>
+</span><a name="line-793"></a><span>
+</span><a name="line-794"></a><span>
+</span><a name="line-795"></a><span class="hs-comment">-- | One more function, this one is also free from `return` and (`&gt;&gt;=`):</span><span>
+</span><a name="line-796"></a><span class="hs-comment">--</span><span>
+</span><a name="line-797"></a><span class="hs-comment">-- @parseA `&gt;&gt;` parseB@ parses A, but tosses the result before parsing B</span><span>
+</span><a name="line-798"></a><span class="hs-comment">--</span><span>
+</span><a name="line-799"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-800"></a><span class="hs-comment">-- (&gt;&gt;) :: `Parse` a -&gt; `Parse` b -&gt; `Parse` b</span><span>
+</span><a name="line-801"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-802"></a><span class="hs-comment">--</span><span>
+</span><a name="line-803"></a><span class="hs-comment">-- This is like (`&gt;&gt;`), but backwards.</span><span>
+</span><a name="line-804"></a><span class="hs-comment">--</span><span>
+</span><a name="line-805"></a><span class="hs-comment">-- @parseA `&lt;&lt;` parseB@ parses A, then B, but tosses B</span><span>
+</span><a name="line-806"></a><span class="hs-comment">--</span><span>
+</span><a name="line-807"></a><span class="hs-comment">-- If you want to understand how it works:</span><span>
+</span><a name="line-808"></a><span class="hs-comment">--</span><span>
+</span><a name="line-809"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-810"></a><span class="hs-comment">-- `liftM2` :: (a -&gt; b -&gt; c) -&gt; `Parse` a -&gt; `Parse` b -&gt; `Parse` c</span><span>
+</span><a name="line-811"></a><span class="hs-comment">-- `liftM2` func parser1 parser2 = run parser1, run parser2, return their results combined with func</span><span>
+</span><a name="line-812"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-813"></a><span class="hs-comment">--</span><span>
+</span><a name="line-814"></a><span class="hs-comment">-- Now @`liftM2` `const`@ makes sense. It runs both parsers, but @`const` a b = a@</span><span>
+</span><a name="line-815"></a><span class="hs-comment">-- so it tosses the result of the second parser.</span><span>
+</span><a name="line-816"></a><span class="hs-comment">--</span><span>
+</span><a name="line-817"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-818"></a><span class="hs-comment">-- (`&lt;&lt;`) = `liftM2` `const`</span><span>
+</span><a name="line-819"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-820"></a><span class="hs-special">(</span><span class="hs-operator">&lt;&lt;</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Monad</span><span> </span><a href="#local-6989586621679031342"><span class="hs-identifier hs-type">m</span></a><span> </span><span class="hs-glyph">=&gt;</span><span> </span><a href="#local-6989586621679031342"><span class="hs-identifier hs-type">m</span></a><span> </span><a href="#local-6989586621679031343"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="#local-6989586621679031342"><span class="hs-identifier hs-type">m</span></a><span> </span><a href="#local-6989586621679031344"><span class="hs-identifier hs-type">b</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="#local-6989586621679031342"><span class="hs-identifier hs-type">m</span></a><span> </span><a href="#local-6989586621679031343"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-821"></a><span class="hs-special">(</span><a name="%3C%3C"><a href="Tutorial.html#%3C%3C"><span class="hs-operator">&lt;&lt;</span></a></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">liftM2</span><span> </span><span class="hs-identifier hs-var">const</span><span>
+</span><a name="line-822"></a><span>
+</span><a name="line-823"></a><span class="hs-comment">-- | Parse any single space</span><span>
+</span><a name="line-824"></a><span class="hs-comment">--</span><span>
+</span><a name="line-825"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-826"></a><span class="hs-comment">--  `space` = `charP` `isSpace`</span><span>
+</span><a name="line-827"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-828"></a><span class="hs-identifier">space</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-829"></a><a name="space"><a href="Tutorial.html#space"><span class="hs-identifier">space</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#charP"><span class="hs-identifier hs-var">charP</span></a><span> </span><span class="hs-identifier hs-var">isSpace</span><span>
+</span><a name="line-830"></a><span>
+</span><a name="line-831"></a><span class="hs-comment">-- | Isn't this pretty?</span><span>
+</span><a name="line-832"></a><span class="hs-comment">--</span><span>
+</span><a name="line-833"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-834"></a><span class="hs-comment">--  `inParens` p = `char` '(' `&gt;&gt;` p `&lt;&lt;` `char` ')'</span><span>
+</span><a name="line-835"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-836"></a><span class="hs-identifier">inParens</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679030900"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><a href="#local-6989586621679030900"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-837"></a><a name="inParens"><a href="Tutorial.html#inParens"><span class="hs-identifier">inParens</span></a></a><span> </span><a name="local-6989586621679033380"><a href="#local-6989586621679033380"><span class="hs-identifier">p</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#char"><span class="hs-identifier hs-var">char</span></a><span> </span><span class="hs-char">'('</span><span> </span><span class="hs-operator hs-var">&gt;&gt;</span><span> </span><a href="#local-6989586621679033380"><span class="hs-identifier hs-var">p</span></a><span> </span><a href="Tutorial.html#%3C%3C"><span class="hs-operator hs-var">&lt;&lt;</span></a><span> </span><a href="Tutorial.html#char"><span class="hs-identifier hs-var">char</span></a><span> </span><span class="hs-char">')'</span><span>
+</span><a name="line-838"></a><span>
+</span><a name="line-839"></a><span class="hs-comment">-- | Parse a series of alpha characters</span><span>
+</span><a name="line-840"></a><span class="hs-comment">--</span><span>
+</span><a name="line-841"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-842"></a><span class="hs-comment">--  `word` = `some` `$` `charP` `isAlpha`</span><span>
+</span><a name="line-843"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-844"></a><span class="hs-identifier">word</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-identifier hs-type">String</span><span>
+</span><a name="line-845"></a><a name="word"><a href="Tutorial.html#word"><span class="hs-identifier">word</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">some</span><span> </span><span class="hs-operator hs-var">$</span><span> </span><a href="Tutorial.html#charP"><span class="hs-identifier hs-var">charP</span></a><span> </span><span class="hs-identifier hs-var">isAlpha</span><span>
+</span><a name="line-846"></a><span>
+</span><a name="line-847"></a><span class="hs-comment">-- | In words: &quot;the input must start with 'Name ', but once we know it's there, just toss it and parse a word&quot;</span><span>
+</span><a name="line-848"></a><span class="hs-comment">--</span><span>
+</span><a name="line-849"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-850"></a><span class="hs-comment">--  `name` = `string` &quot;Name &quot; `&gt;&gt;` `word`</span><span>
+</span><a name="line-851"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-852"></a><span class="hs-identifier">name</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-identifier hs-type">String</span><span>
+</span><a name="line-853"></a><a name="name"><a href="Tutorial.html#name"><span class="hs-identifier">name</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#string"><span class="hs-identifier hs-var">string</span></a><span> </span><span class="hs-string">&quot;Name &quot;</span><span> </span><span class="hs-operator hs-var">&gt;&gt;</span><span> </span><a href="Tutorial.html#word"><span class="hs-identifier hs-var">word</span></a><span>
+</span><a name="line-854"></a><span>
+</span><a name="line-855"></a><span>
+</span><a name="line-856"></a><span class="hs-comment">-- | Now let's write a simple parser for something like</span><span>
+</span><a name="line-857"></a><span class="hs-comment">--</span><span>
+</span><a name="line-858"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-859"></a><span class="hs-comment">--  &quot;Class (Name NamedThing)&quot;</span><span>
+</span><a name="line-860"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-861"></a><span class="hs-comment">--</span><span>
+</span><a name="line-862"></a><span class="hs-comment">-- where we only want &quot;Class&quot; and &quot;NamedThing&quot;:</span><span>
+</span><a name="line-863"></a><span class="hs-comment">--</span><span>
+</span><a name="line-864"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-865"></a><span class="hs-comment">--  `classType` = do</span><span>
+</span><a name="line-866"></a><span class="hs-comment">--    className &lt;- `word`            -- get a word and call it 'className'</span><span>
+</span><a name="line-867"></a><span class="hs-comment">--    `many` `space`                   -- get a bunch of spaces, but toss them, they're in the way</span><span>
+</span><a name="line-868"></a><span class="hs-comment">--    typeName  &lt;- `inParens` `name`   -- get a name that's in parentheses and call it 'typeName'</span><span>
+</span><a name="line-869"></a><span class="hs-comment">--    `return` (className, typeName)  -- return what you've gotten in a nice tuple</span><span>
+</span><a name="line-870"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-871"></a><span class="hs-comment">--</span><span>
+</span><a name="line-872"></a><span class="hs-comment">-- examples: (almost exact)</span><span>
+</span><a name="line-873"></a><span class="hs-comment">--</span><span>
+</span><a name="line-874"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-875"></a><span class="hs-comment">-- parse classType &quot;Spoken  (Name Kid)&quot;      = (&quot;Spoken&quot;, &quot;Kid&quot;)</span><span>
+</span><a name="line-876"></a><span class="hs-comment">-- parse classType &quot;Monad   (Name Function)&quot; = (&quot;Monad&quot;,  &quot;Function&quot;)</span><span>
+</span><a name="line-877"></a><span class="hs-comment">-- parse classType &quot;Word1   (Name Word2)&quot;    = (&quot;Word1&quot;,  &quot;Word2&quot;)</span><span>
+</span><a name="line-878"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-879"></a><span class="hs-identifier">classType</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-type">String</span><span class="hs-special">,</span><span> </span><span class="hs-identifier hs-type">String</span><span class="hs-special">)</span><span>
+</span><a name="line-880"></a><a name="classType"><a href="Tutorial.html#classType"><span class="hs-identifier">classType</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><a name="line-881"></a><span>  </span><a name="local-6989586621679033381"><a href="#local-6989586621679033381"><span class="hs-identifier">className</span></a></a><span> </span><span class="hs-glyph">&lt;-</span><span> </span><a href="Tutorial.html#word"><span class="hs-identifier hs-var">word</span></a><span>           </span><span class="hs-comment">-- get a word and call it 'className'</span><span>
+</span><a name="line-882"></a><span>  </span><span class="hs-identifier hs-var">many</span><span> </span><a href="Tutorial.html#space"><span class="hs-identifier hs-var">space</span></a><span>                  </span><span class="hs-comment">-- get a bunch of spaces, but toss them, they're in the way</span><span>
+</span><a name="line-883"></a><span>  </span><a name="local-6989586621679033382"><a href="#local-6989586621679033382"><span class="hs-identifier">typeName</span></a></a><span>  </span><span class="hs-glyph">&lt;-</span><span> </span><a href="Tutorial.html#inParens"><span class="hs-identifier hs-var">inParens</span></a><span> </span><a href="Tutorial.html#name"><span class="hs-identifier hs-var">name</span></a><span>  </span><span class="hs-comment">-- get a name that's in parentheses and call it 'typeName'</span><span>
+</span><a name="line-884"></a><span>  </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-special">(</span><a href="#local-6989586621679033381"><span class="hs-identifier hs-var">className</span></a><span class="hs-special">,</span><span> </span><a href="#local-6989586621679033382"><span class="hs-identifier hs-var">typeName</span></a><span class="hs-special">)</span><span>     </span><span class="hs-comment">-- return what you've gotten in a nice tuple</span><span>
+</span><a name="line-885"></a><span>
+</span><a name="line-886"></a><span>
+</span><a name="line-887"></a><span class="hs-comment">-- $parse_lisp</span><span>
+</span><a name="line-888"></a><span class="hs-comment">-- Ok, so that wasn't bad. However, it's also not too hard to parse something like that in the first place.</span><span>
+</span><a name="line-889"></a><span class="hs-comment">-- How about parsing a lisp that only supports addition of natural numbers? Huh, that could be neat.</span><span>
+</span><a name="line-890"></a><span class="hs-comment">--</span><span>
+</span><a name="line-891"></a><span class="hs-comment">-- Here's what I invision it looking like:</span><span>
+</span><a name="line-892"></a><span class="hs-comment">--</span><span>
+</span><a name="line-893"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-894"></a><span class="hs-comment">--  1 -&gt; 1</span><span>
+</span><a name="line-895"></a><span class="hs-comment">--  (+ 2 2) -&gt; 4</span><span>
+</span><a name="line-896"></a><span class="hs-comment">--  (+ (+ 1 2) (+ 3 4)) -&gt; 10</span><span>
+</span><a name="line-897"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-898"></a><span class="hs-comment">--</span><span>
+</span><a name="line-899"></a><span class="hs-comment">-- For completion sake, we define: @(+ x) -&gt; x@ and make @(+)@ or @()@ a parse error.</span><span>
+</span><a name="line-900"></a><span class="hs-comment">--</span><span>
+</span><a name="line-901"></a><span class="hs-comment">--</span><span>
+</span><a name="line-902"></a><span class="hs-comment">-- First, let's define our expression type:</span><span>
+</span><a name="line-903"></a><span class="hs-comment">--</span><span>
+</span><a name="line-904"></a><span class="hs-comment">-- This is a GADT, but that's for another time. It could easily be defined as the following:</span><span>
+</span><a name="line-905"></a><span class="hs-comment">--</span><span>
+</span><a name="line-906"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-907"></a><span class="hs-comment">--  data `Expr` a = `Lit` a | `Sum` [`Expr` a]</span><span>
+</span><a name="line-908"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-909"></a><span class="hs-comment">--</span><span>
+</span><a name="line-910"></a><span class="hs-comment">-- But I prefer the GADT style:</span><span>
+</span><a name="line-911"></a><span class="hs-comment">--</span><span>
+</span><a name="line-912"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-913"></a><span class="hs-comment">--  data `Expr` a where</span><span>
+</span><a name="line-914"></a><span class="hs-comment">--    `Lit` ::       a  -&gt; `Expr` a</span><span>
+</span><a name="line-915"></a><span class="hs-comment">--    `Sum` :: [`Expr` a] -&gt; `Expr` a</span><span>
+</span><a name="line-916"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-917"></a><span>
+</span><a name="line-918"></a><span class="hs-comment">--</span><span>
+</span><a name="line-919"></a><span class="hs-comment">-- | An Expression with type @a@ can be:</span><span>
+</span><a name="line-920"></a><span class="hs-keyword">data</span><span> </span><a name="Expr"><a href="Tutorial.html#Expr"><span class="hs-identifier">Expr</span></a></a><span> </span><a name="local-6989586621679027268"><a href="#local-6989586621679027268"><span class="hs-identifier">a</span></a></a><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-921"></a><span>  </span><span class="hs-comment">-- | A numeric literal, e.g. @1337@ or @42@</span><span>
+</span><a name="line-922"></a><span>  </span><a name="Lit"><a href="Tutorial.html#Lit"><span class="hs-identifier">Lit</span></a></a><span> </span><span class="hs-glyph">::</span><span>       </span><a href="#local-6989586621679030827"><span class="hs-identifier hs-type">a</span></a><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Expr"><span class="hs-identifier hs-type">Expr</span></a><span> </span><a href="#local-6989586621679030827"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-923"></a><span>
+</span><a name="line-924"></a><span>  </span><span class="hs-comment">-- | A sum of expressions</span><span>
+</span><a name="line-925"></a><span>  </span><a name="Sum"><a href="Tutorial.html#Sum"><span class="hs-identifier">Sum</span></a></a><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><a href="Tutorial.html#Expr"><span class="hs-identifier hs-type">Expr</span></a><span> </span><a href="#local-6989586621679030828"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="Tutorial.html#Expr"><span class="hs-identifier hs-type">Expr</span></a><span> </span><a href="#local-6989586621679030828"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-926"></a><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-type">Eq</span><span class="hs-special">,</span><span> </span><span class="hs-identifier hs-type">Ord</span><span class="hs-special">)</span><span>
+</span><a name="line-927"></a><span>
+</span><a name="line-928"></a><span class="hs-comment">-- | A literal is:</span><span>
+</span><a name="line-929"></a><span class="hs-comment">--</span><span>
+</span><a name="line-930"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-931"></a><span class="hs-comment">--  `parseLit` = do</span><span>
+</span><a name="line-932"></a><span class="hs-comment">--    `some` `space`                           -- toss some spaces</span><span>
+</span><a name="line-933"></a><span class="hs-comment">--    digits &lt;- `some` `digit`                 -- the literal's digits are just &quot;some digits&quot;</span><span>
+</span><a name="line-934"></a><span class="hs-comment">--    `return` `.` `Lit` `.` toNum `.` `read` `$` digits -- return the digits, read and converted to a nice `Num` type, then wrapped in the `Lit` constructor</span><span>
+</span><a name="line-935"></a><span class="hs-comment">--      where</span><span>
+</span><a name="line-936"></a><span class="hs-comment">--        toNum :: `Num` a =&gt; `Int` -&gt; a</span><span>
+</span><a name="line-937"></a><span class="hs-comment">--        toNum = `fromInteger` `.` `toEnum`</span><span>
+</span><a name="line-938"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-939"></a><span class="hs-identifier">parseLit</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Num</span><span> </span><a href="#local-6989586621679030899"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">=&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Expr"><span class="hs-identifier hs-type">Expr</span></a><span> </span><a href="#local-6989586621679030899"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span>
+</span><a name="line-940"></a><a name="parseLit"><a href="Tutorial.html#parseLit"><span class="hs-identifier">parseLit</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><a name="line-941"></a><span>  </span><span class="hs-identifier hs-var">many</span><span> </span><a href="Tutorial.html#space"><span class="hs-identifier hs-var">space</span></a><span>
+</span><a name="line-942"></a><span>  </span><a name="local-6989586621679033802"><a href="#local-6989586621679033802"><span class="hs-identifier">digits</span></a></a><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-identifier hs-var">some</span><span> </span><a href="Tutorial.html#digit"><span class="hs-identifier hs-var">digit</span></a><span>
+</span><a name="line-943"></a><span>  </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-operator hs-var">.</span><span> </span><a href="Tutorial.html#Lit"><span class="hs-identifier hs-var">Lit</span></a><span> </span><span class="hs-operator hs-var">.</span><span> </span><a href="#local-6989586621679033383"><span class="hs-identifier hs-var">toNum</span></a><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-identifier hs-var">read</span><span> </span><span class="hs-operator hs-var">$</span><span> </span><a href="#local-6989586621679033802"><span class="hs-identifier hs-var">digits</span></a><span>
+</span><a name="line-944"></a><span>    </span><span class="hs-keyword">where</span><span>
+</span><a name="line-945"></a><span>      </span><span class="hs-identifier">toNum</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Num</span><span> </span><a href="#local-6989586621679033384"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier hs-type">Int</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="#local-6989586621679033384"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-946"></a><span>      </span><a name="local-6989586621679033383"><a href="#local-6989586621679033383"><span class="hs-identifier">toNum</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">fromInteger</span><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-identifier hs-var">toEnum</span><span>
+</span><a name="line-947"></a><span>
+</span><a name="line-948"></a><span class="hs-comment">-- | A sum is:</span><span>
+</span><a name="line-949"></a><span class="hs-comment">--</span><span>
+</span><a name="line-950"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-951"></a><span class="hs-comment">--  `parseSum` = do</span><span>
+</span><a name="line-952"></a><span class="hs-comment">--    `char` \'(\'                     -- starts with an opening parentheses</span><span>
+</span><a name="line-953"></a><span class="hs-comment">--    `char` \'+\'                       -- then there's a '+'</span><span>
+</span><a name="line-954"></a><span class="hs-comment">--    subExprs &lt;- `some` `parseExpr`   -- then there are some subexpressions, each one is either a literal or a sum</span><span>
+</span><a name="line-955"></a><span class="hs-comment">--    `char` \')\'                     -- end with a closing parentheses</span><span>
+</span><a name="line-956"></a><span class="hs-comment">--    `return` `$` `Sum` subExprs        -- return the subexpressions wrapped in our `Sum` constructor</span><span>
+</span><a name="line-957"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-958"></a><span class="hs-identifier">parseSum</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Num</span><span> </span><a href="#local-6989586621679030898"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">=&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Expr"><span class="hs-identifier hs-type">Expr</span></a><span> </span><a href="#local-6989586621679030898"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span>
+</span><a name="line-959"></a><a name="parseSum"><a href="Tutorial.html#parseSum"><span class="hs-identifier">parseSum</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><a name="line-960"></a><span>  </span><a href="Tutorial.html#char"><span class="hs-identifier hs-var">char</span></a><span> </span><span class="hs-char">'('</span><span>
+</span><a name="line-961"></a><span>  </span><a href="Tutorial.html#char"><span class="hs-identifier hs-var">char</span></a><span> </span><span class="hs-char">'+'</span><span>
+</span><a name="line-962"></a><span>  </span><a name="local-6989586621679033827"><a href="#local-6989586621679033827"><span class="hs-identifier">subExprs</span></a></a><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-identifier hs-var">some</span><span> </span><span class="hs-special">(</span><a href="Tutorial.html#parseLit"><span class="hs-identifier hs-var">parseLit</span></a><span> </span><span class="hs-operator hs-var">&lt;|&gt;</span><span> </span><a href="Tutorial.html#parseSum"><span class="hs-identifier hs-var">parseSum</span></a><span class="hs-special">)</span><span>
+</span><a name="line-963"></a><span>  </span><a href="Tutorial.html#char"><span class="hs-identifier hs-var">char</span></a><span> </span><span class="hs-char">')'</span><span>
+</span><a name="line-964"></a><span>  </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-operator hs-var">$</span><span> </span><a href="Tutorial.html#Sum"><span class="hs-identifier hs-var">Sum</span></a><span> </span><a href="#local-6989586621679033827"><span class="hs-identifier hs-var">subExprs</span></a><span>
+</span><a name="line-965"></a><span>
+</span><a name="line-966"></a><span class="hs-comment">-- | An expression is:</span><span>
+</span><a name="line-967"></a><span class="hs-comment">--</span><span>
+</span><a name="line-968"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-969"></a><span class="hs-comment">--  `parseExpr` = `parseLit` &lt;|&gt; `parseSum` -- either a literal or a sum</span><span>
+</span><a name="line-970"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-971"></a><span class="hs-identifier">parseExpr</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Num</span><span> </span><a href="#local-6989586621679030897"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">=&gt;</span><span> </span><a href="Tutorial.html#Parse"><span class="hs-identifier hs-type">Parse</span></a><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Expr"><span class="hs-identifier hs-type">Expr</span></a><span> </span><a href="#local-6989586621679030897"><span class="hs-identifier hs-type">a</span></a><span class="hs-special">)</span><span>
+</span><a name="line-972"></a><a name="parseExpr"><a href="Tutorial.html#parseExpr"><span class="hs-identifier">parseExpr</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Tutorial.html#parseLit"><span class="hs-identifier hs-var">parseLit</span></a><span> </span><span class="hs-operator hs-var">&lt;|&gt;</span><span> </span><a href="Tutorial.html#parseSum"><span class="hs-identifier hs-var">parseSum</span></a><span>
+</span><a name="line-973"></a><span>
+</span><a name="line-974"></a><span class="hs-comment">-- $that_was_easy</span><span>
+</span><a name="line-975"></a><span class="hs-comment">-- Well, that was easy. Let's make a quick evaluator:</span><span>
+</span><a name="line-976"></a><span>
+</span><a name="line-977"></a><span class="hs-comment">-- | To evaluate an expression:</span><span>
+</span><a name="line-978"></a><span class="hs-comment">--</span><span>
+</span><a name="line-979"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-980"></a><span class="hs-comment">--  `eval` (`Lit` x ) = x                  -- we unwrap literals</span><span>
+</span><a name="line-981"></a><span class="hs-comment">--  `eval` (`Sum` xs) = `sum` (`fmap` `eval` xs) -- and sum the evaluated subexpressions in a `Sum`</span><span>
+</span><a name="line-982"></a><span class="hs-comment">-- @</span><span>
+</span><a name="line-983"></a><span class="hs-identifier">eval</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Num</span><span> </span><a href="#local-6989586621679030832"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">=&gt;</span><span> </span><a href="Tutorial.html#Expr"><span class="hs-identifier hs-type">Expr</span></a><span> </span><a href="#local-6989586621679030832"><span class="hs-identifier hs-type">a</span></a><span> </span><span class="hs-glyph">-&gt;</span><span> </span><a href="#local-6989586621679030832"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-984"></a><a name="eval"><a href="Tutorial.html#eval"><span class="hs-identifier">eval</span></a></a><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Lit"><span class="hs-identifier hs-var">Lit</span></a><span> </span><a name="local-6989586621679033828"><a href="#local-6989586621679033828"><span class="hs-identifier">x</span></a></a><span> </span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><a href="#local-6989586621679033828"><span class="hs-identifier hs-var">x</span></a><span>
+</span><a name="line-985"></a><span class="hs-identifier">eval</span><span> </span><span class="hs-special">(</span><a href="Tutorial.html#Sum"><span class="hs-identifier hs-var">Sum</span></a><span> </span><a name="local-6989586621679033829"><a href="#local-6989586621679033829"><span class="hs-identifier">xs</span></a></a><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">sum</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">map</span><span> </span><a href="Tutorial.html#eval"><span class="hs-identifier hs-var">eval</span></a><span> </span><a href="#local-6989586621679033829"><span class="hs-identifier hs-var">xs</span></a><span class="hs-special">)</span><span>
+</span><a name="line-986"></a><span>
+</span><a name="line-987"></a><span class="hs-comment">-- $conclusions</span><span>
+</span><a name="line-988"></a><span class="hs-comment">-- Ok, so that was easy too. I'm gonna go off and extend this until it gets hard.</span><span>
+</span><a name="line-989"></a></pre></body></html>

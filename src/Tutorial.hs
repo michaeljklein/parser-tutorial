@@ -161,10 +161,10 @@ instance (CoArbitrary a) => CoArbitrary (Expr a) where
   coarbitrary (Lit x) = coarbitrary x
   coarbitrary (Sum x) = coarbitrary x
 
--- | Convert a
+-- | (This is for the test suite, but defined here because I haven't moved it yet.) Convert a
 --
 -- @
---  `String -> (`Bool`, `Int`, a)
+--  `String` -> (`Bool`, `Int`, a)
 -- @
 --
 -- function into a parser by:

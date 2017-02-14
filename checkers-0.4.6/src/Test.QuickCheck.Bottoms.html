@@ -1,0 +1,35 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Test</span><span class="hs-operator">.</span><span class="hs-identifier">QuickCheck</span><span class="hs-operator">.</span><span class="hs-identifier">Bottoms</span><span> </span><span class="hs-special">(</span><a href="Test.QuickCheck.Bottoms.html#bottom"><span class="hs-identifier hs-var">bottom</span></a><span class="hs-special">,</span><a href="Test.QuickCheck.Bottoms.html#infiniteComp"><span class="hs-identifier hs-var">infiniteComp</span></a><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-2"></a><span>
+</span><a name="line-3"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Test</span><span class="hs-operator">.</span><span class="hs-identifier">QuickCheck</span><span>
+</span><a name="line-4"></a><span>
+</span><a name="line-5"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Control</span><span class="hs-operator">.</span><span class="hs-identifier">Monad</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">forever</span><span class="hs-special">)</span><span>
+</span><a name="line-6"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">System</span><span class="hs-operator">.</span><span class="hs-identifier">IO</span><span class="hs-operator">.</span><span class="hs-identifier">Unsafe</span><span>
+</span><a name="line-7"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Control</span><span class="hs-operator">.</span><span class="hs-identifier">Concurrent</span><span>
+</span><a name="line-8"></a><span>
+</span><a name="line-9"></a><span class="hs-identifier">bottom</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><a href="#local-6989586621679043357"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-10"></a><a name="bottom"><a href="Test.QuickCheck.Bottoms.html#bottom"><span class="hs-identifier">bottom</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-identifier hs-var">undefined</span><span>
+</span><a name="line-11"></a><span>
+</span><a name="line-12"></a><span class="hs-identifier">infiniteComp</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><a href="#local-6989586621679043356"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-13"></a><a name="infiniteComp"><a href="Test.QuickCheck.Bottoms.html#infiniteComp"><span class="hs-identifier">infiniteComp</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">return</span><span> </span><a href="Test.QuickCheck.Bottoms.html#hang"><span class="hs-identifier hs-var">hang</span></a><span>
+</span><a name="line-14"></a><span>
+</span><a name="line-15"></a><span class="hs-comment">-- Without using unsafePerformIO, is there a way to define a</span><span>
+</span><a name="line-16"></a><span class="hs-comment">-- non-terminating but non-erroring pure value that consume very little</span><span>
+</span><a name="line-17"></a><span class="hs-comment">-- resources while not terminating?</span><span>
+</span><a name="line-18"></a><span>
+</span><a name="line-19"></a><span class="hs-comment">-- | Never yield an answer.  Like 'undefined' or 'error &quot;whatever&quot;', but</span><span>
+</span><a name="line-20"></a><span class="hs-comment">-- don't raise an error, and don't consume computational resources.</span><span>
+</span><a name="line-21"></a><span class="hs-identifier">hang</span><span> </span><span class="hs-glyph">::</span><span> </span><a href="#local-6989586621679043355"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-22"></a><a name="hang"><a href="Test.QuickCheck.Bottoms.html#hang"><span class="hs-identifier">hang</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">unsafePerformIO</span><span> </span><a href="Test.QuickCheck.Bottoms.html#hangIO"><span class="hs-identifier hs-var">hangIO</span></a><span>
+</span><a name="line-23"></a><span>
+</span><a name="line-24"></a><span class="hs-comment">-- | Block forever</span><span>
+</span><a name="line-25"></a><span class="hs-identifier">hangIO</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">IO</span><span> </span><a href="#local-6989586621679043354"><span class="hs-identifier hs-type">a</span></a><span>
+</span><a name="line-26"></a><a name="hangIO"><a href="Test.QuickCheck.Bottoms.html#hangIO"><span class="hs-identifier">hangIO</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span> </span><span class="hs-comment">-- putStrLn &quot;warning: blocking forever.&quot;</span><span>
+</span><a name="line-27"></a><span>            </span><span class="hs-comment">-- Any never-terminating computation goes here</span><span>
+</span><a name="line-28"></a><span>            </span><span class="hs-comment">-- This one can yield an exception &quot;thread blocked indefinitely&quot;</span><span>
+</span><a name="line-29"></a><span>            </span><span class="hs-comment">-- newEmptyMVar &gt;&gt;= takeMVar</span><span>
+</span><a name="line-30"></a><span>            </span><span class="hs-comment">-- sjanssen suggests this alternative:</span><span>
+</span><a name="line-31"></a><span>            </span><span class="hs-identifier">_</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-identifier hs-var">forever</span><span> </span><span class="hs-operator hs-var">$</span><span> </span><span class="hs-identifier hs-var">threadDelay</span><span> </span><span class="hs-identifier hs-var">maxBound</span><span>
+</span><a name="line-32"></a><span>            </span><span class="hs-comment">-- forever's return type is (), though it could be fully</span><span>
+</span><a name="line-33"></a><span>            </span><span class="hs-comment">-- polymorphic.  Until it's fixed, I need the following line.</span><span>
+</span><a name="line-34"></a><span>            </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-identifier hs-var">undefined</span><span>
+</span><a name="line-35"></a></pre></body></html>

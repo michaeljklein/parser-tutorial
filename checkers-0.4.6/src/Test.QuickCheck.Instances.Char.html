@@ -1,0 +1,82 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Test</span><span class="hs-operator">.</span><span class="hs-identifier">QuickCheck</span><span class="hs-operator">.</span><span class="hs-identifier">Instances</span><span class="hs-operator">.</span><span class="hs-identifier">Char</span><span>
+</span><a name="line-2"></a><span>       </span><span class="hs-special">(</span><a href="Test.QuickCheck.Instances.Char.html#nonSpace"><span class="hs-identifier hs-var">nonSpace</span></a><span class="hs-special">,</span><a href="Test.QuickCheck.Instances.Char.html#whitespace"><span class="hs-identifier hs-var">whitespace</span></a><span class="hs-special">,</span><a href="Test.QuickCheck.Instances.Char.html#space"><span class="hs-identifier hs-var">space</span></a><span class="hs-special">,</span><a href="Test.QuickCheck.Instances.Char.html#newline"><span class="hs-identifier hs-var">newline</span></a><span>
+</span><a name="line-3"></a><span>       </span><span class="hs-special">,</span><a href="Test.QuickCheck.Instances.Char.html#lowerAlpha"><span class="hs-identifier hs-var">lowerAlpha</span></a><span class="hs-special">,</span><a href="Test.QuickCheck.Instances.Char.html#upperAlpha"><span class="hs-identifier hs-var">upperAlpha</span></a><span class="hs-special">,</span><a href="Test.QuickCheck.Instances.Char.html#numeric"><span class="hs-identifier hs-var">numeric</span></a><span>
+</span><a name="line-4"></a><span>       </span><span class="hs-special">,</span><a href="Test.QuickCheck.Instances.Char.html#parenthesis"><span class="hs-identifier hs-var">parenthesis</span></a><span class="hs-special">,</span><a href="Test.QuickCheck.Instances.Char.html#bracket"><span class="hs-identifier hs-var">bracket</span></a><span class="hs-special">,</span><a href="Test.QuickCheck.Instances.Char.html#brace"><span class="hs-identifier hs-var">brace</span></a><span>
+</span><a name="line-5"></a><span>       </span><span class="hs-special">,</span><a href="Test.QuickCheck.Instances.Char.html#operator"><span class="hs-identifier hs-var">operator</span></a><span>
+</span><a name="line-6"></a><span>       </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><a name="line-7"></a><span>
+</span><a name="line-8"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Data</span><span class="hs-operator">.</span><span class="hs-identifier">Char</span><span>
+</span><a name="line-9"></a><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Test</span><span class="hs-operator">.</span><span class="hs-identifier">QuickCheck</span><span>
+</span><a name="line-10"></a><span class="hs-keyword">import</span><span> </span><a href="Test.QuickCheck.Instances.Eq.html"><span class="hs-identifier">Test</span><span class="hs-operator">.</span><span class="hs-identifier">QuickCheck</span><span class="hs-operator">.</span><span class="hs-identifier">Instances</span><span class="hs-operator">.</span><span class="hs-identifier">Eq</span></a><span>
+</span><a name="line-11"></a><span>
+</span><a name="line-12"></a><span class="hs-comment">-- instance Arbitrary Char where</span><span>
+</span><a name="line-13"></a><span class="hs-comment">--     arbitrary   = choose ('\0','\255')</span><span>
+</span><a name="line-14"></a><span class="hs-comment">--     coarbitrary = variant . ord</span><span>
+</span><a name="line-15"></a><span>
+</span><a name="line-16"></a><span class="hs-comment">-- instance Arbitrary Char where</span><span>
+</span><a name="line-17"></a><span class="hs-comment">--     arbitrary   = choose ('\0','\255')</span><span>
+</span><a name="line-18"></a><span>
+</span><a name="line-19"></a><span class="hs-comment">-- instance CoArbitrary Char where</span><span>
+</span><a name="line-20"></a><span class="hs-comment">--     coarbitrary = variant . ord</span><span>
+</span><a name="line-21"></a><span>
+</span><a name="line-22"></a><span class="hs-comment">-- Bob: why the `rem` 4 ?</span><span>
+</span><a name="line-23"></a><span>
+</span><a name="line-24"></a><span class="hs-comment">{- | Generates a 'non space' character, i.e. any ascii except
+     ' ', '\t', '\n' and '\r'.
+-}</span><span>
+</span><a name="line-27"></a><span class="hs-identifier">nonSpace</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-28"></a><a name="nonSpace"><a href="Test.QuickCheck.Instances.Char.html#nonSpace"><span class="hs-identifier">nonSpace</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><a href="Test.QuickCheck.Instances.Eq.html#notOneof"><span class="hs-identifier hs-var">notOneof</span></a><span> </span><span class="hs-string">&quot; \t\n\r&quot;</span><span>
+</span><a name="line-29"></a><span>
+</span><a name="line-30"></a><span class="hs-comment">{- | Generates any whitespace character, including new lines.
+-}</span><span>
+</span><a name="line-32"></a><span class="hs-identifier">whitespace</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-33"></a><a name="whitespace"><a href="Test.QuickCheck.Instances.Char.html#whitespace"><span class="hs-identifier">whitespace</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">oneof</span><span> </span><span class="hs-special">[</span><a href="Test.QuickCheck.Instances.Char.html#space"><span class="hs-identifier hs-var">space</span></a><span class="hs-special">,</span><a href="Test.QuickCheck.Instances.Char.html#newline"><span class="hs-identifier hs-var">newline</span></a><span class="hs-special">]</span><span>
+</span><a name="line-34"></a><span>
+</span><a name="line-35"></a><span class="hs-comment">{- | Generates a whitespace charecter, not a newline.
+-}</span><span>
+</span><a name="line-37"></a><span class="hs-identifier">space</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-38"></a><a name="space"><a href="Test.QuickCheck.Instances.Char.html#space"><span class="hs-identifier">space</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">oneof</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">map</span><span> </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-string">&quot; \t&quot;</span><span class="hs-special">)</span><span>
+</span><a name="line-39"></a><span>
+</span><a name="line-40"></a><span class="hs-comment">{- | Generates either a '\n' or '\r'.
+-}</span><span>
+</span><a name="line-42"></a><span class="hs-identifier">newline</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-43"></a><a name="newline"><a href="Test.QuickCheck.Instances.Char.html#newline"><span class="hs-identifier">newline</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">oneof</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">map</span><span> </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-string">&quot;\n\r&quot;</span><span class="hs-special">)</span><span>
+</span><a name="line-44"></a><span>
+</span><a name="line-45"></a><span class="hs-identifier">letters</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">String</span><span>
+</span><a name="line-46"></a><a name="letters"><a href="Test.QuickCheck.Instances.Char.html#letters"><span class="hs-identifier">letters</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-string">&quot;abcdefghijklmnopqrstuvwxyz&quot;</span><span>
+</span><a name="line-47"></a><span>
+</span><a name="line-48"></a><span class="hs-comment">{- | Generates any lower case alpha character.
+-}</span><span>
+</span><a name="line-50"></a><span class="hs-identifier">lowerAlpha</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-51"></a><a name="lowerAlpha"><a href="Test.QuickCheck.Instances.Char.html#lowerAlpha"><span class="hs-identifier">lowerAlpha</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">oneof</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">map</span><span> </span><span class="hs-identifier hs-var">return</span><span> </span><a href="Test.QuickCheck.Instances.Char.html#letters"><span class="hs-identifier hs-var">letters</span></a><span class="hs-special">)</span><span>
+</span><a name="line-52"></a><span>
+</span><a name="line-53"></a><span class="hs-comment">{- | Generates any upper case alpha character.
+-}</span><span>
+</span><a name="line-55"></a><span class="hs-identifier">upperAlpha</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-56"></a><a name="upperAlpha"><a href="Test.QuickCheck.Instances.Char.html#upperAlpha"><span class="hs-identifier">upperAlpha</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">oneof</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">map</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-operator hs-var">.</span><span> </span><span class="hs-identifier hs-var">toUpper</span><span class="hs-special">)</span><span> </span><a href="Test.QuickCheck.Instances.Char.html#letters"><span class="hs-identifier hs-var">letters</span></a><span class="hs-special">)</span><span>
+</span><a name="line-57"></a><span>
+</span><a name="line-58"></a><span class="hs-comment">{- | Generates a digit character.
+-}</span><span>
+</span><a name="line-60"></a><span class="hs-identifier">numeric</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-61"></a><a name="numeric"><a href="Test.QuickCheck.Instances.Char.html#numeric"><span class="hs-identifier">numeric</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">oneof</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">map</span><span> </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-string">&quot;1234567890&quot;</span><span class="hs-special">)</span><span>
+</span><a name="line-62"></a><span>
+</span><a name="line-63"></a><span class="hs-comment">{- | Generates one or other of '(' and ')'.
+-}</span><span>
+</span><a name="line-65"></a><span class="hs-identifier">parenthesis</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-66"></a><a name="parenthesis"><a href="Test.QuickCheck.Instances.Char.html#parenthesis"><span class="hs-identifier">parenthesis</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">oneof</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">map</span><span> </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-string">&quot;()&quot;</span><span class="hs-special">)</span><span>
+</span><a name="line-67"></a><span>
+</span><a name="line-68"></a><span class="hs-comment">{- | Generates one or other of '[' and ']'.
+-}</span><span>
+</span><a name="line-70"></a><span class="hs-identifier">bracket</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-71"></a><a name="bracket"><a href="Test.QuickCheck.Instances.Char.html#bracket"><span class="hs-identifier">bracket</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">oneof</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">map</span><span> </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-string">&quot;[]&quot;</span><span class="hs-special">)</span><span>
+</span><a name="line-72"></a><span>
+</span><a name="line-73"></a><span class="hs-comment">{- | Generates one or other of '{' and '}'.
+-}</span><span>
+</span><a name="line-75"></a><span class="hs-identifier">brace</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-76"></a><a name="brace"><a href="Test.QuickCheck.Instances.Char.html#brace"><span class="hs-identifier">brace</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">oneof</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">map</span><span> </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-string">&quot;{}&quot;</span><span class="hs-special">)</span><span>
+</span><a name="line-77"></a><span>
+</span><a name="line-78"></a><span class="hs-comment">{- | Generates one of '*', '/', '-', '+', '&lt;', '&gt;', '|' and '#'.
+-}</span><span>
+</span><a name="line-80"></a><span class="hs-identifier">operator</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier hs-type">Gen</span><span> </span><span class="hs-identifier hs-type">Char</span><span>
+</span><a name="line-81"></a><a name="operator"><a href="Test.QuickCheck.Instances.Char.html#operator"><span class="hs-identifier">operator</span></a></a><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier hs-var">oneof</span><span> </span><span class="hs-special">(</span><span class="hs-identifier hs-var">map</span><span> </span><span class="hs-identifier hs-var">return</span><span> </span><span class="hs-string">&quot;*/-+&lt;&gt;|#&quot;</span><span class="hs-special">)</span><span>
+</span><a name="line-82"></a></pre></body></html>
