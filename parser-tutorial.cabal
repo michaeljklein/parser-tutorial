@@ -1,7 +1,7 @@
 name:                parser-tutorial
 version:             0.1.0.0
--- synopsis:
--- description:
+synopsis:            A tutorial on monadic parsing in Haskell
+description:         Includes a small monadic parsing library with extensive documentation
 homepage:            https://github.com/michaeljklein/parser-tutorial#readme
 license:             BSD3
 license-file:        LICENSE

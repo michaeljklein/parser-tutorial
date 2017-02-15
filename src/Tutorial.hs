@@ -915,7 +915,6 @@ classType = do
 --    `Sum` :: [`Expr` a] -> `Expr` a
 -- @
 
---
 -- | An Expression with type @a@ can be:
 data Expr a where
   -- | A numeric literal, e.g. @1337@ or @42@
