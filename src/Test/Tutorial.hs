@@ -30,7 +30,11 @@ import Test.QuickCheck.Classes
 import Tutorial
 import Data.Maybe
 
-
+-- | The checkers package provides methods to automatically verify instances.
+-- These methods require at most the instances included here to run.
+--
+-- Additionally, since this allows the dynamic packaging of arbitrary parsers, I include `Parse` wrapped in `Gen`
+-- for ease of using with arbitrary parameters to parsers, e.g. `charP`.
 data SomeParser = forall a. (EqProp a, Show a, Arbitrary a, CoArbitrary a) => SomeParser (String, Gen (Parse a))
 
 instance Show SomeParser where
@@ -39,37 +43,47 @@ instance Show SomeParser where
 instance Testable Char where
   property _ = property True
 
+-- | `SomeParser` that wraps `return`
 someReturn :: (EqProp a, Show a, Arbitrary a, CoArbitrary a) => a -> SomeParser
 someReturn x = SomeParser ("return: " ++ show x, return <$> arbitrary `asTypeOf` (return x))
 
+-- | Type-constrained `return`
 rGen :: a -> Gen a
 rGen = return
 
+-- | Apply any function that requires no more instances than those provided to a single `SomeParser`
 testSomeParser :: (forall a. (EqProp a, Show a, Arbitrary a, CoArbitrary a) => Parse a -> TestBatch) -> SomeParser -> Gen TestBatch
 testSomeParser f (SomeParser (s, x)) = f <$> x
 
+-- | See `testSomeParser`
 testSomeParser2 :: (forall a b. (EqProp a, Show a, Arbitrary a, CoArbitrary a, EqProp b, Show b, Arbitrary b, CoArbitrary b) => Parse (a, b) -> TestBatch) -> SomeParser -> SomeParser -> Gen TestBatch
 testSomeParser2 f (SomeParser (s1, x1)) (SomeParser (s2, x2)) = f <$> liftM2 (liftM2 (,)) x1 x2
 
+-- | See `testSomeParser`
 testSomeParser3 :: (forall a b c. (EqProp a, Show a, Arbitrary a, CoArbitrary a, EqProp b, Show b, Arbitrary b, CoArbitrary b, EqProp c, Show c, Arbitrary c, CoArbitrary c) => Parse (a, b, c) -> TestBatch) -> SomeParser -> SomeParser -> SomeParser -> Gen TestBatch
 testSomeParser3 f (SomeParser (s1, x1)) (SomeParser (s2, x2)) (SomeParser (s3, x3)) = f <$> liftM3 (liftM3 (,,)) x1 x2 x3
 
+-- | Uses `functor` to check the `Functor` instance for `Parse`
 prop_parseIsFunctor :: SomeParser -> SomeParser -> SomeParser -> Gen TestBatch
 prop_parseIsFunctor = testSomeParser3 functor
 
+-- | Uses `applicative` to check the `Applicative` instance for `Parse`
 prop_parseIsApplicative :: SomeParser -> SomeParser -> SomeParser -> Gen TestBatch
 prop_parseIsApplicative = testSomeParser3 applicative
 
+-- | Uses `monad` to check the `Monad` instance for `Parse`
 prop_parseIsMonad :: SomeParser -> SomeParser -> SomeParser -> Gen TestBatch
 prop_parseIsMonad = testSomeParser3 monad
 
+-- | Uses `monadFunctor` to check that the `Monad` instance for `Parse` properly relates to `Functor`
 prop_parseIsMonadFunctor :: SomeParser -> SomeParser -> Gen TestBatch
 prop_parseIsMonadFunctor = testSomeParser2 monadFunctor
 
+-- | Uses `alternative` to check the `Alternative` instance for `Parse`
 prop_parseIsAlternative :: SomeParser -> Gen TestBatch
 prop_parseIsAlternative = testSomeParser alternative
 
-
+-- | Does the given parser consume exactly @n@ characters of the given `String`?
 consumes :: Int -> Parse a -> String -> Bool
 consumes n (Parser parser) str = case parser str of
   Left rest -> length rest == length str
@@ -80,6 +94,7 @@ testCharParser :: (Char -> Bool) -> Parse a -> String -> Bool
 testCharParser f p (c:cs) | f c       = consumes 1 p (c:cs)
                           | otherwise = consumes 0 p (c:cs)
 testCharParser _ p _                  = consumes 0 p []
+
 
 prop_charP :: (Char -> Bool) -> String -> Bool
 prop_charP p = testCharParser p (charP p)
