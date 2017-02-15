@@ -16,10 +16,6 @@ matrix:
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
 
     - env: BUILD=stack STACK_YAML=stack.yaml
-      compiler: ": #stack 7.10.3"
-      addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
-
-    - env: BUILD=stack STACK_YAML=stack.yaml
       compiler: ": #stack 7.10.3 osx"
       os: osx
 
@@ -36,6 +32,9 @@ matrix:
       os: osx
 
   allow_failures:
+    - env: BUILD=stack STACK_YAML=stack.yaml
+      compiler: ": #stack 7.10.3"
+      addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
 
     - env: BUILD=stack STACK_YAML=stack.yaml
       compiler: ": #stack 7.10.3 osx"
