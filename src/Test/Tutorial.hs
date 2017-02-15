@@ -129,7 +129,7 @@ instance Integral a => Show (Expr a) where
 instance Arbitrary SomeParser where
   arbitrary = aParser
 
-
+-- | I wrap most of the parsers defined in the tutorial file in `SomeParser`, allowing the random generation, combination, and testing of parsers.
 aParser :: Gen SomeParser
 aParser = oneof $ [ (\x -> SomeParser ("charP", return $ (charP :: (Char ->Bool) ->Parse Char) x)) <$> arbitrary
                   , (\x -> SomeParser ("char: " ++ show x, return $ (char :: Char ->Parse Char) x)) <$> arbitrary

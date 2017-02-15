@@ -29,16 +29,12 @@ executable test
                      , parser-tutorial
   default-language:    Haskell2010
 
-
 test-suite test-parser-tutorial
-  type:                detailed-0.9
-  hs-source-dirs:      test
-  test-module:         Spec
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      app
+  main-is: Main.hs
   build-depends:       base >= 4.7 && < 5
-                     , Cabal >= 1.9.2
-                     , QuickCheck
-                     , cabal-test-quickcheck
-                     , checkers
+                     , parser-tutorial
   default-language:    Haskell2010
 
 source-repository head
